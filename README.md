@@ -1,4 +1,45 @@
-# Sentinel FPV Ground Station - Backend
+# Sentinel GCS
+
+Sentinel GCS is a private, backend-first ground-control and video-analytics
+prototype for authorised security operations. It combines a React operations
+console with an isolated FastAPI/Docker processing stack for video ingestion,
+object tracking, telemetry fusion, geofencing, events, V2X messages, and an
+optional advisory scene-review layer.
+
+> [!IMPORTANT]
+> This repository is an engineering prototype, not a certified military,
+> aviation, safety, navigation, identity, or port-security product. Never use
+> it as the sole basis for safety-critical or enforcement decisions.
+
+## Start here
+
+| Goal | Read / run |
+| --- | --- |
+| Join the private team and run the stack | [Team setup](docs/TEAM_SETUP.md) |
+| Configure or change a camera IP | `./set_camera_source.ps1 -Source <IP-or-URL>` |
+| Start the complete local stack | `./start_sentinel.ps1` |
+| Understand the processing layers | [Architecture](docs/ARCHITECTURE.md) |
+| Prepare a production deployment | [Deployment and cutover](docs/DEPLOYMENT_AND_CUTOVER.md) |
+| Train or release a port model | [Port model release standard](docs/PORT_MODEL_RELEASE_STANDARD.md) |
+| Report a vulnerability | [Security policy](SECURITY.md) |
+
+### Repository contents
+
+| Path | Purpose |
+| --- | --- |
+| `app/` | FastAPI API, video pipeline, tracking, fusion, event, V2X, and advisory services |
+| `models/` | Private Git LFS runtime model bundle and model documentation |
+| `scripts/` | Camera and operational support utilities |
+| `tests/` | Automated contract, unit, security, and resilience tests |
+| `docs/` | Architecture, deployment, assurance, safety, and performance records |
+| `.github/` | Continuous integration and pull-request guidance |
+
+### What is deliberately not in Git
+
+Camera URLs, `.env` secrets, API keys, evidence, databases, logs, training
+datasets, and generated outputs are ignored. Runtime model weights are stored
+in the private repository through Git LFS; run `git lfs pull` after cloning.
+See [models/README.md](models/README.md) for the approved model bundle.
 
 This is a deterministic, backend-first FPV security processing system. It is ready for a real RTSP/IP camera URL or a Windows USB capture source; no UI configuration is required to start the processing services.
 
