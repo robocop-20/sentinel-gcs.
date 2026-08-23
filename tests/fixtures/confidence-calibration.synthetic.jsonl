@@ -1,0 +1,4 @@
+{"class":"person","confidence":0.9,"correct":true}
+{"class":"person","confidence":0.8,"correct":true}
+{"class":"vehicle","confidence":0.8,"correct":false}
+{"class":"vehicle","confidence":0.2,"correct":false}

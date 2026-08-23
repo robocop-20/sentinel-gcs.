@@ -1,0 +1,28 @@
+.env
+config/camera-source.txt
+.venv/
+.assurance-venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+secrets/
+backups/
+db/
+evidence/
+reports/
+*.log
+
+# Model weights, training inputs, and generated training output are distributed
+# separately from the source repository. They can be large, licensed
+# independently, and may contain sensitive operational data.
+models/
+*.pt
+*.onnx
+*.engine
+*.weights
+training/datasets/
+training/runs/
+runs/
+cloud_training/*.zip

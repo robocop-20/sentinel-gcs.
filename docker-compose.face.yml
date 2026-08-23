@@ -1,0 +1,12 @@
+services:
+  api:
+    environment:
+      ENABLE_FACE_DETECTION: "true"
+  vision:
+    environment:
+      ENABLE_FACE_DETECTION: "true"
+      FACE_DETECTOR_MODEL_PATH: /models/face/yunet.onnx
+      TARGET_OBJECT_CLASSES: person,boat,vessel,car,truck,bus,motorcycle,container,shipping_container,vehicle
+      FACE_DETECTION_CONFIDENCE: "0.65"
+      FACE_QUALITY_MIN_SCORE: "0.65"
+      PRIVACY_BLUR_FACES: "true"

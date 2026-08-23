@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#252b31">
+  <title>Sentinel GCS | Operations</title>
+  <link rel="stylesheet" href="/styles.css?v=20260816-7">
+  <link rel="stylesheet" href="/operations.css?v=20260823-6">
+</head>
+<body data-workspace="flight">
+  <header class="app-header">
+    <div class="product-mark" aria-label="Sentinel ground control station">
+      <span class="product-symbol" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3 27 9v14l-11 6L5 23V9Z"/><path d="m10 17 4 4 8-10"/></svg></span>
+      <div><b>Sentinel</b><small>GROUND CONTROL</small></div>
+    </div>
+    <nav class="workspace-tabs" aria-label="Workspace">
+      <button class="workspace-tab active" data-workspace="flight">Flight</button>
+      <button class="workspace-tab" data-workspace="plan">Plan</button>
+      <button class="workspace-tab" data-workspace="camera">Camera</button>
+      <button class="workspace-tab" data-workspace="tracks">Tracks</button>
+      <button class="workspace-tab" data-workspace="alerts">Alerts</button>
+    </nav>
+    <div class="header-telemetry" aria-label="Current flight status">
+      <div><small>VEHICLE</small><b id="vehicle-name">NO VEHICLE</b></div>
+      <div><small>MODE</small><b id="flight-mode">N/A</b></div>
+      <div><small>GPS</small><b id="gps-state">NO FIX</b></div>
+      <div><small>UTC</small><b id="mission-clock">--:--:--</b></div>
+      <div class="adviser-header"><small>ADVISER</small><b id="llm-provider-header">LOCAL ONLY</b></div>
+      <div id="connection" class="connection-state warning"><i></i>Connecting</div>
+    </div>
+  </header>
+
+  <section id="failsafe-strip" class="system-banner degraded" role="status">
+    <b id="failsafe-title">System check</b>
+    <span id="failsafe-detail">Waiting for backend health.</span>
+    <span class="authority-boundary">Advisory mode · auto-action locked</span>
+  </section>
+
+  <main class="operations-shell">
+    <nav class="tool-rail" aria-label="Primary tools">
+      <button class="rail-button active" data-workspace="flight" title="Flight workspace"><svg viewBox="0 0 24 24"><path d="m3 11 18-8-8 18-2-8Z"/></svg><small>FLY</small></button>
+      <button class="rail-button" data-workspace="plan" title="Mission planning"><svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 17c4-1 2-8 6-9l4-1"/></svg><small>PLAN</small></button>
+      <button class="rail-button" data-workspace="camera" title="Camera workspace"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="m8 6 1.5-2h5L16 6"/></svg><small>CAM</small></button>
+      <button class="rail-button" data-workspace="tracks" title="Track workspace"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg><small>TRK</small></button>
+      <button class="rail-button" data-workspace="alerts" title="Alert workspace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 17H3Z"/><path d="M12 9v4m0 3h.01"/></svg><small>ALRT</small></button>
+      <button class="rail-button" data-workspace="sensors" title="Sensor workspace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M4.9 5.9l2.8 2.8m8.6 8.6 2.8 2.8M3 12h4m10 0h4M4.9 18.1l2.8-2.8m8.6-8.6 2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg><small>SNSR</small></button>
+      <button class="rail-button" data-workspace="systems" title="System layers"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg><small>SYS</small></button>
+      <button class="rail-button" data-workspace="analyze" title="Historical analysis"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5M5 20h8M4 17h5"/></svg><small>ANLZ</small></button>
+      <button class="rail-button" data-workspace="evidence" title="Evidence custody"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6l2 2h8v12H4Z"/><path d="M9 12h6m-6 3h4"/></svg><small>EVID</small></button>
+      <button class="rail-button" data-workspace="settings" title="Settings and diagnostics"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-3v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2.1-2.1.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H5v-3h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L8.4 6l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4.7h3v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.1 2.1-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2v3h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg><small>SET</small></button>
+      <div class="rail-spacer"></div>
+      <button class="rail-button" id="center-map" title="Centre tactical map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><small>CTR</small></button>
+    </nav>
+
+    <section class="workspace-area">
+      <div id="map-workspace" class="workspace-view map-workspace" data-view="flight plan">
+        <div class="map-commandbar">
+          <div class="command-group plan-commands">
+            <button id="mission-new">New</button>
+            <input id="mission-name" aria-label="Mission name" maxlength="120" value="Untitled mission">
+            <input id="mission-vehicle" aria-label="Vehicle ID" maxlength="96" placeholder="Vehicle ID">
+            <button id="mission-undo" disabled>Undo</button>
+            <button id="mission-clear" disabled>Clear</button>
+            <button id="mission-save">Save + validate</button>
+            <button id="mission-export" disabled>Export</button>
+          </div>
+          <div class="map-layer-tabs" aria-label="Map layer">
+            <button class="active" data-map-layer="mission">Mission</button>
+            <button data-map-layer="geofence">Geofence</button>
+            <button data-map-layer="tracks">Tracks</button>
+          </div>
+          <div class="map-source"><i></i><span id="map-source-label">LOCAL GRID · BASEMAP NOT CONFIGURED</span></div>
+          <button class="upload-button" id="mission-upload" disabled title="MAVLink mission upload is not commissioned">Vehicle offline</button>
+        </div>
+
+        <div class="map-stage">
+          <canvas id="tactical-canvas" aria-label="Mission planning map with aircraft, geofences, tracks and waypoints"></canvas>
+          <div class="map-tools" aria-label="Mission tools">
+            <button class="active" data-map-tool="select" title="Select and inspect" aria-label="Select and inspect"><svg viewBox="0 0 24 24"><path d="m5 3 12 9-6 1-3 6Z"/></svg></button>
+            <button data-map-tool="waypoint" title="Add waypoint" aria-label="Add waypoint"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button>
+            <button data-map-tool="measure" title="Measure route" aria-label="Measure route"><svg viewBox="0 0 24 24"><path d="M4 17 9 7l6 10 5-8"/><circle cx="4" cy="17" r="1.5"/><circle cx="20" cy="9" r="1.5"/></svg></button>
+            <button id="street-view-button" title="Open Street View at cursor" aria-label="Open Street View at cursor"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.5"/><path d="M8 11h8M12 8v12M8.5 20 12 14l3.5 6"/></svg></button>
+          </div>
+          <div class="map-compass" aria-label="Map orientation"><b>N</b><span></span></div>
+          <div class="map-zoom"><button id="map-zoom-in">+</button><button id="map-zoom-out">−</button></div>
+          <div class="map-scale"><span id="map-scale-bar"></span><b id="map-scale-label">100 m</b></div>
+          <div class="map-legend"><span><i class="vehicle-dot"></i>Aircraft</span><span><i class="track-dot"></i>Track</span><span><i class="fence-dot"></i>Restricted</span><span><i class="route-dot"></i>Draft route</span></div>
+          <div class="map-readout"><span id="cursor-coordinate">CURSOR N/A</span><b id="plot-state">LOCAL / AWAITING GPS</b></div>
+          <div class="map-attribution"><span id="map-attribution-state">LIVE MAP</span> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></div>
+          <div id="map-hint" class="map-hint hidden">Click the map to place a waypoint</div>
+        </div>
+
+        <div class="mission-strip">
+          <div><small>PLAN STATE</small><b id="mission-state">LOCAL DRAFT</b></div>
+          <div><small>WAYPOINTS</small><b id="mission-waypoint-count">0</b></div>
+          <div><small>DISTANCE</small><b id="mission-distance">0 m</b></div>
+          <div><small>EST. TIME</small><b id="mission-time">--</b></div>
+          <div><small>MAX RANGE</small><b id="mission-range">0 m</b></div>
+          <div class="mission-warning"><small>MISSION STATUS</small><b id="mission-warning-text">DRAFT ONLY — NOT UPLOADED</b></div>
+        </div>
+      </div>
+
+      <div id="camera-workspace" class="workspace-view sensor-wall hidden" data-view="camera">
+        <div class="workspace-title"><div><small>SENSORS</small><h2>Camera feeds</h2></div><span>1 configured · 3 offline</span></div>
+        <div class="sensor-wall-grid">
+          <article class="wall-feed wall-feed-primary">
+            <header><b>EO-01 · ANNOTATED</b><span id="wall-camera-state">WAITING</span></header>
+            <div class="wall-video"><img id="sensor-wall-preview" alt="Primary annotated electro-optical camera"><div id="wall-video-wait" class="feed-empty">Awaiting primary camera frame</div><div class="wall-reticle"></div></div>
+            <footer><span id="wall-model-name">YOLO11</span><span id="wall-resolution">-- × --</span><span id="wall-fps">0.0 FPS</span></footer>
+          </article>
+          <article class="wall-feed offline"><header><b>IR-01 · THERMAL</b><span>NOT LINKED</span></header><div class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="m16 10 5-3v10l-5-3M6 4c1 1 1 3 0 4m4-4c1 1 1 3 0 4"/></svg></span><span>RTSP endpoint not configured</span></div><footer><span>CHANNEL 02</span><span>NO SIGNAL</span></footer></article>
+          <article class="wall-feed offline"><header><b>PORT-02 · FIXED</b><span>NOT LINKED</span></header><div class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 10h13l3 3v4H6l-3-3Z"/><circle cx="10" cy="13.5" r="2.5"/><path d="M16 7V4h4v9M4 18h4"/></svg></span><span>VMS adapter not configured</span></div><footer><span>CHANNEL 03</span><span>NO SIGNAL</span></footer></article>
+          <article class="wall-feed offline"><header><b>VEH-01 · PATROL</b><span>NOT LINKED</span></header><div class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m4 14 2-5h12l2 5v4H4Z"/><path d="M7 9V6h10v3M4 14h16"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg></span><span>V2X video endpoint not configured</span></div><footer><span>CHANNEL 04</span><span>NO SIGNAL</span></footer></article>
+        </div>
+      </div>
+
+      <div id="tracks-workspace" class="workspace-view console-workspace hidden" data-view="tracks">
+        <div class="workspace-title"><div><small>CONTACT MANAGEMENT</small><h2>Track registry</h2></div><span id="tracks-workspace-count">0 active</span></div>
+        <div class="registry-toolbar" aria-label="Track registry controls">
+          <div class="registry-stats"><span><small>Confirmed</small><b id="track-stat-confirmed">0</b></span><span><small>Geolocated</small><b id="track-stat-geolocated">0</b></span><span><small>Elevated risk</small><b id="track-stat-risk">0</b></span></div>
+          <div class="registry-filters"><label><span>Search</span><input id="track-filter" type="search" placeholder="ID or class" autocomplete="off"></label><label><span>Class</span><select id="track-class-filter"><option value="">All classes</option><option value="person">Person</option><option value="vehicle">Vehicle</option><option value="boat">Vessel</option><option value="container">Container</option></select></label></div>
+        </div>
+        <div class="workspace-split">
+          <div class="data-table-wrap"><table class="operations-table"><thead><tr><th>ID</th><th>Class</th><th>Model confidence</th><th>State</th><th>Motion</th><th>Zone</th><th>Risk</th><th>Last update</th></tr></thead><tbody id="track-table-body"></tbody></table></div>
+          <aside id="tracks-workspace-detail" class="workspace-detail"><div class="inspector-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="6"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4m-4.9-4.9 2.8-2.8M4.1 19.9l2.8-2.8m0-10L4.1 4.3m15.8 15.6-2.8-2.8"/></svg></span><b>No track selected</b><p>Select a track to view its detection history, motion, and evidence.</p></div></aside>
+        </div>
+      </div>
+
+      <div id="alerts-workspace" class="workspace-view console-workspace hidden" data-view="alerts">
+        <div class="workspace-title"><div><small>EVENT MANAGEMENT</small><h2>Alert queue</h2></div><span id="alerts-workspace-count">0 open</span></div>
+        <div class="registry-toolbar" aria-label="Alert queue controls">
+          <div class="registry-stats"><span><small>Open</small><b id="alert-stat-open">0</b></span><span><small>Critical</small><b id="alert-stat-critical">0</b></span><span><small>Under review</small><b id="alert-stat-review">0</b></span></div>
+          <div class="registry-filters"><label><span>Search</span><input id="alert-filter" type="search" placeholder="Type, source or track" autocomplete="off"></label><label><span>Severity</span><select id="alert-severity-filter"><option value="">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Information</option></select></label></div>
+        </div>
+        <div class="data-table-wrap"><table class="operations-table"><thead><tr><th>Severity</th><th>UTC</th><th>Type</th><th>Source</th><th>Track</th><th>State</th><th>Reason</th><th>Action</th></tr></thead><tbody id="alert-table-body"></tbody></table></div>
+      </div>
+
+      <div id="sensors-workspace" class="workspace-view console-workspace hidden" data-view="sensors">
+        <div class="workspace-title"><div><small>SENSORS</small><h2>Sensor status</h2></div><span>Live values only</span></div>
+        <div class="sensor-status-grid">
+          <article><header>GNSS</header><b id="sensor-gps-fix">Awaiting telemetry</b><dl><div><dt>Satellites</dt><dd id="sensor-gps-sat">N/A</dd></div><div><dt>HDOP</dt><dd id="sensor-gps-hdop">N/A</dd></div><div><dt>Age</dt><dd id="sensor-gps-age">N/A</dd></div></dl></article>
+          <article><header>IMU / ATTITUDE</header><b id="sensor-imu-state">Awaiting telemetry</b><dl><div><dt>Roll</dt><dd id="sensor-roll">N/A</dd></div><div><dt>Pitch</dt><dd id="sensor-pitch">N/A</dd></div><div><dt>Heading</dt><dd id="sensor-heading">N/A</dd></div></dl></article>
+          <article><header>LiDAR / RANGE</header><b id="sensor-lidar-state">Awaiting telemetry</b><dl><div><dt>Range</dt><dd id="sensor-lidar-range">N/A</dd></div><div><dt>Orientation</dt><dd id="sensor-lidar-orientation">N/A</dd></div><div><dt>Age</dt><dd id="sensor-lidar-age">N/A</dd></div></dl></article>
+          <article><header>POWER / LINK</header><b id="sensor-link-state">Awaiting telemetry</b><dl><div><dt>Battery</dt><dd id="sensor-battery">N/A</dd></div><div><dt>RSSI</dt><dd id="sensor-link">N/A</dd></div><div><dt>Vehicle</dt><dd id="sensor-vehicle">N/A</dd></div></dl></article>
+          <article><header>CAMERA</header><b id="sensor-camera-state">OFFLINE</b><dl><div><dt>Capture</dt><dd id="sensor-camera-fps">N/A</dd></div><div><dt>Frame age</dt><dd id="sensor-camera-age">N/A</dd></div><div><dt>Source</dt><dd id="sensor-camera-source">N/A</dd></div></dl></article>
+          <article><header>GIMBAL</header><b>NOT CONFIGURED</b><dl><div><dt>Pose</dt><dd>N/A</dd></div><div><dt>Calibration</dt><dd>UNKNOWN</dd></div><div><dt>Age</dt><dd>N/A</dd></div></dl></article>
+        </div>
+      </div>
+
+      <div id="systems-workspace" class="workspace-view systems-workspace hidden" data-view="systems">
+        <div class="workspace-title"><div><small>SYSTEMS</small><h2>Subsystem health</h2></div><span id="systems-summary">0 / 0 READY</span></div>
+        <div id="systems-layer-grid" class="systems-layer-grid"><p class="empty">Loading layer status…</p></div>
+      </div>
+
+      <div id="analyze-workspace" class="workspace-view console-workspace hidden" data-view="analyze">
+        <div class="workspace-title analysis-header">
+          <div><small>ANALYZE</small><h2>Bounded operational timeline</h2></div>
+          <div class="analysis-controls" aria-label="Read-only history replay controls">
+            <label>FROM <input id="replay-start" type="datetime-local" aria-label="Replay start time"></label>
+            <label>TO <input id="replay-end" type="datetime-local" aria-label="Replay end time"></label>
+            <button id="replay-load" type="button">Load replay</button>
+            <button id="replay-exit" type="button" disabled>Return live</button>
+          </div>
+          <span id="analysis-mode">LIVE HISTORY</span>
+        </div>
+        <div id="analysis-timeline" class="timeline-list"><p class="empty">No current track or event history</p></div>
+      </div>
+
+      <div id="evidence-workspace" class="workspace-view console-workspace hidden" data-view="evidence">
+        <div class="workspace-title"><div><small>EVIDENCE</small><h2>Integrity and review custody</h2></div><span>AUTHORIZED OPERATORS ONLY</span></div>
+        <div id="evidence-workspace-list" class="evidence-grid"><p class="empty">No retained evidence is available for review.</p></div>
+      </div>
+
+      <div id="settings-workspace" class="workspace-view console-workspace hidden" data-view="settings">
+        <div class="workspace-title"><div><small>SETTINGS</small><h2>Controlled configuration boundaries</h2></div><span>SERVER AUTHORIZATION REQUIRED</span></div>
+        <div class="settings-sections">
+          <section class="operator-config"><h3>Primary camera</h3><p>Update the active phone or IP-camera endpoint. The bridge reloads it without restarting vision.</p><form id="camera-source-form"><label for="camera-source-input">Camera URL or IP address</label><div class="config-form-row"><input id="camera-source-input" type="text" inputmode="url" autocomplete="off" placeholder="172.18.217.28:8080 or http://host:port/videofeed" required><button type="submit">Apply source</button></div><small id="camera-source-status" aria-live="polite">Loading active source…</small></form><dl><div><dt>Storage</dt><dd><code>config/camera-source.txt</code></dd></div><div><dt>Behavior</dt><dd>Atomic update · bridge hot reload</dd></div></dl></section>
+          <section class="operator-config"><h3>Asset registry</h3><p>Register endpoints for additional cameras, patrol vehicles, drones, or infrastructure. Registration does not activate a feed or grant V2X control.</p><form id="asset-registration-form"><div class="config-form-grid"><label>Asset ID<input id="asset-id-input" maxlength="96" pattern="[A-Za-z0-9][A-Za-z0-9_.:-]+" placeholder="port-camera-02" required></label><label>Type<select id="asset-type-input"><option value="camera">Camera</option><option value="vehicle">Vehicle</option><option value="drone">Drone</option><option value="infrastructure">Infrastructure</option></select></label></div><label>Endpoint<input id="asset-endpoint-input" type="text" inputmode="url" autocomplete="off" placeholder="http://device-host:port/endpoint" required></label><div class="config-form-row"><button type="submit">Register asset</button><small id="asset-registration-status" aria-live="polite"></small></div></form><div id="operator-asset-list" class="operator-asset-list"><p class="empty">No additional assets registered.</p></div></section>
+          <section><h3>Vision</h3><dl><div><dt>Model</dt><dd id="settings-model">N/A</dd></div><div><dt>Integrity</dt><dd id="settings-model-integrity">UNKNOWN</dd></div><div><dt>Device</dt><dd id="settings-vision-device">N/A</dd></div></dl></section>
+          <section><h3>AI advisory</h3><dl><div><dt>Provider</dt><dd id="settings-llm-provider">DISABLED</dd></div><div><dt>Authority</dt><dd>ADVISORY ONLY</dd></div><div><dt>Image egress</dt><dd id="settings-llm-egress">BLOCKED</dd></div></dl></section>
+          <section><h3>Security</h3><dl><div><dt>Session</dt><dd>SHORT-LIVED TOKEN</dd></div><div><dt>Audit</dt><dd>APPEND-ONLY CHAIN</dd></div><div><dt>Automatic actions</dt><dd>DISABLED</dd></div></dl></section>
+        </div>
+      </div>
+    </section>
+
+    <aside class="right-dock">
+      <section class="dock-panel mission-inspector-panel" aria-labelledby="mission-inspector-title">
+        <header><div><small>MISSION</small><b id="mission-inspector-title">Plan inspector</b></div><span id="mission-inspector-state">LOCAL DRAFT</span></header>
+        <div class="inspector-mode-tabs" aria-label="Mission inspector mode">
+          <button class="active" type="button">Waypoint</button>
+          <button type="button" disabled title="Area scan generator is not commissioned">Area scan</button>
+          <button type="button" disabled title="Structure scan generator is not commissioned">Structure</button>
+        </div>
+        <form id="mission-inspector-form" class="mission-inspector-form">
+          <label><span>Default altitude</span><span class="unit-field"><input id="mission-default-altitude" type="number" min="1" max="500" step="1" value="50"><small>m</small></span></label>
+          <label><span>Cruise speed</span><span class="unit-field"><input id="mission-cruise-speed" type="number" min="0.1" max="80" step="0.1" value="8"><small>m/s</small></span></label>
+          <label><span>Hold at waypoint</span><span class="unit-field"><input id="mission-hold-time" type="number" min="0" max="3600" step="1" value="0"><small>s</small></span></label>
+          <button id="mission-apply-defaults" type="button">Apply values to draft</button>
+        </form>
+        <dl class="mission-inspector-summary">
+          <div><dt>Route points</dt><dd id="inspector-waypoint-count">0</dd></div>
+          <div><dt>Calculated distance</dt><dd id="inspector-distance">0 m</dd></div>
+          <div><dt>Vehicle adapter</dt><dd>NOT CONNECTED</dd></div>
+          <div><dt>Scan generator</dt><dd>NOT COMMISSIONED</dd></div>
+        </dl>
+        <p class="inspector-note">Draft-only values. Vehicle upload requires validation and a MAVLink adapter.</p>
+      </section>
+
+      <section class="dock-panel intelligence-panel alert-panel" aria-labelledby="alerts-title">
+        <header><div><small>OPERATOR ACTION</small><b id="alerts-title">Security event queue</b></div><span><b id="event-count">0</b> OPEN</span></header>
+        <div id="event-list" class="dock-list event-list"><p class="empty">No alerts. Event rules are monitoring confirmed tracks.</p></div>
+        <footer class="panel-shortcuts"><span><kbd>J</kbd> NEXT</span><span><kbd>A</kbd> REVIEW</span></footer>
+      </section>
+
+      <section class="dock-panel track-panel" aria-labelledby="tracks-title">
+        <header><div><small>CONTACTS</small><b id="tracks-title">Confirmed anonymous tracks</b></div><span><b id="object-count">0</b> ACTIVE</span></header>
+        <div id="track-detail" class="track-detail" aria-live="polite">
+          <p class="empty">Select a track on the map or list</p>
+        </div>
+        <div id="object-list" class="dock-list track-list"><p class="empty">No tracks. Confirmed detections appear here.</p></div>
+      </section>
+
+      <section class="dock-panel camera-panel">
+        <header><div><small>PRIMARY PAYLOAD</small><b>EO-01 / AI OVERLAY</b></div><span id="preview-status">WAITING</span></header>
+        <div class="primary-video">
+          <img id="vision-preview" alt="Live annotated object detection preview">
+          <div id="video-wait" class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="6" width="14" height="12" rx="2"/><circle cx="10" cy="12" r="3"/><path d="m17 10 4-2v8l-4-2M7 6l1-2h4l1 2"/></svg></span><span>Waiting for OpenCV frames</span></div>
+          <div class="video-osd top"><span id="preview-camera">CAMERA-01</span><span id="model-name">YOLO11</span></div>
+          <div class="video-osd bottom"><span id="frame-count">FRAME --</span><span id="preview-resolution">-- × --</span></div>
+          <div class="compact-reticle"></div>
+        </div>
+        <div class="camera-tabs">
+          <button class="active" data-camera="eo-01"><b>EO-01</b><small>PRIMARY</small></button>
+          <button data-camera="ir-01" disabled><b>IR-01</b><small>NO LINK</small></button>
+          <button data-camera="port-02" disabled><b>PORT-02</b><small>NO LINK</small></button>
+        </div>
+      </section>
+
+      <section class="dock-panel layers-panel">
+        <header><div><small>PIPELINE</small><b>Software layers</b></div><span id="readiness-score">0 / 0</span></header>
+        <div id="layer-list" class="layer-list"><p class="empty">Loading layer status…</p></div>
+      </section>
+
+      <section class="dock-panel network-panel">
+        <header><div><small>NETWORK</small><b>Connected assets</b></div><span id="v2x-count">0 ONLINE</span></header>
+        <div class="network-summary"><span id="v2x-mode">GATEWAY DISABLED</span><span id="v2x-tls">TLS: NOT CONFIGURED</span></div>
+        <div id="v2x-list" class="device-list"><p class="empty">No authenticated peers</p></div>
+      </section>
+
+      <section class="dock-panel advisory-panel">
+        <header><div><small>EXTERNAL ADVISER</small><b id="llm-provider-label">Not configured</b></div><span id="llm-state">ISOLATED</span></header>
+        <dl class="provider-status" aria-label="External advisory provider status">
+          <div><dt>Selected model</dt><dd id="llm-model-value">—</dd></div>
+          <div><dt>Provider key</dt><dd id="llm-key-state">Not configured</dd></div>
+          <div><dt>Image egress</dt><dd id="llm-egress-state">Blocked</dd></div>
+          <div><dt>Reason</dt><dd id="llm-disabled-reason">Awaiting health</dd></div>
+          <div class="provider-option"><dt>OpenRouter adapter</dt><dd id="openrouter-adapter-state">Checking</dd></div>
+        </dl>
+        <div id="advisory-list" class="advisory-list"><p class="empty">No advisory reviews</p></div>
+      </section>
+    </aside>
+
+    <section class="instrument-deck">
+      <div class="attitude-module">
+        <div class="attitude-indicator" id="attitude-indicator"><div class="attitude-sky"></div><div class="attitude-ground"></div><div class="attitude-horizon"></div><div class="aircraft-reference"><i></i><span></span><i></i></div></div>
+        <div><small>ATTITUDE</small><b id="attitude-state">NO IMU</b></div>
+      </div>
+      <div class="heading-module" aria-label="Compass heading">
+        <div class="heading-title"><small>COMPASS HEADING</small><span id="heading-status">IMU REQUIRED</span></div>
+        <div class="heading-display">
+          <div id="heading-rose" class="heading-rose" aria-hidden="true"><span class="rose-n">N</span><span class="rose-e">E</span><span class="rose-s">S</span><span class="rose-w">W</span></div>
+          <span class="heading-pointer" aria-hidden="true"></span>
+          <div class="heading-readout"><b id="heading">—</b><span id="heading-cardinal">NO HEADING</span></div>
+        </div>
+        <small id="heading-note" class="heading-note">Awaiting flight-controller telemetry</small>
+      </div>
+      <div class="instrument-value"><small>ALTITUDE</small><b id="altitude">--</b><span>m</span></div>
+      <div class="instrument-value"><small>GROUND SPEED</small><b id="speed">--</b><span>m/s</span></div>
+      <div class="instrument-value"><small>BATTERY</small><b id="battery">--</b><span>%</span></div>
+      <div class="instrument-value"><small>LINK</small><b id="rssi">--</b><span>%</span></div>
+      <div class="instrument-value"><small>LiDAR</small><b id="lidar">--</b><span>m</span></div>
+      <div class="instrument-value"><small>CAPTURE</small><b id="capture-fps">0.0</b><span>fps</span></div>
+      <div class="instrument-value"><small>INFERENCE</small><b id="preview-fps">0.0</b><span>fps</span></div>
+      <div class="instrument-value"><small>LATENCY</small><b id="preview-latency">--</b><span>ms</span></div>
+      <div class="instrument-value"><small>TRACKS</small><b id="sensor-detections">0</b><span>active</span></div>
+      <div class="deck-position"><small>POSITION</small><b id="position">AWAITING TELEMETRY</b><span id="model-integrity">MODEL UNVERIFIED</span></div>
+    </section>
+  </main>
+
+  <dialog id="ack-dialog" class="ack-dialog" aria-labelledby="ack-title">
+    <form id="ack-form" method="dialog">
+      <header><div><small>HUMAN-IN-THE-LOOP REVIEW</small><h2 id="ack-title">Acknowledge security event</h2></div><button type="button" id="ack-close" aria-label="Close acknowledgement dialog">×</button></header>
+      <div class="ack-event-summary" id="ack-event-summary">No event selected</div>
+      <label for="ack-justification">Operator justification</label>
+      <textarea id="ack-justification" minlength="8" maxlength="500" required placeholder="Record what was reviewed and the action taken."></textarea>
+      <p>This records your operator identity and timestamp. It does not trigger an automatic device or enforcement action.</p>
+      <footer><button type="button" id="ack-cancel">Cancel</button><button type="submit" id="ack-confirm">Record review</button></footer>
+    </form>
+  </dialog>
+
+  <footer class="status-bar">
+    <div><i id="status-video"></i>VIDEO</div><div><i id="status-model"></i>PERCEPTION</div><div><i id="status-storage"></i>STORAGE</div><div><i id="status-transport"></i>TRANSPORT</div><div><i id="status-v2x"></i>V2X</div><div><i id="status-adviser"></i><span id="llm-provider-footer">ADVISER LOCAL</span></div>
+    <span>Advisory mode · operator approval required</span>
+  </footer>
+  <script src="/runtime-config.js"></script>
+  <script src="/app.js?v=20260823-3"></script>
+</body>
+</html>

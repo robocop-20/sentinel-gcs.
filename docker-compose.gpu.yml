@@ -1,0 +1,52 @@
+services:
+  api:
+    environment:
+      # API capability reporting mirrors the local vision-only verifier flag.
+      ENABLE_PERSON_VERIFIER: "true"
+  vision:
+    image: fpv-vision-gpu
+    build:
+      context: .
+      dockerfile: Dockerfile.vision-gpu
+    gpus: all
+    environment:
+      YOLO_DEVICE: "0"
+      # Let ByteTrack associate weaker observations to an established track,
+      # but require a stronger score to create a new persistent ID.
+      DETECTION_CONFIDENCE: "0.20"
+      # High-precision operator profile: uncertain object candidates remain
+      # internal to ByteTrack until they have stronger supporting evidence.
+      OBJECT_PUBLISH_CONFIDENCE: "0.45"
+      # A live operator preview should not hide a genuine, continuously
+      # observed person simply because a single frame scored below 0.55.
+      # The remaining gates are still conservative: three observations with
+      # a stable class/mean score, ByteTrack association, and the independent
+      # local verifier for marginal person boxes.
+      # Balanced multi-person profile: smaller or partially occluded people
+      # may enter the confirmation gate at 0.45, but still require four
+      # stable observations and independent local cross-checking.
+      PERSON_PUBLISH_CONFIDENCE: "0.45"
+      PERSON_CONFIRMATION_FRAMES: "4"
+      PERSON_TRACK_MIN_MEAN_CONFIDENCE: "0.52"
+      # 960 keeps small objects readable on a 1080p source without the
+      # disproportionate latency and VRAM cost of full-1920 inference.
+      VISION_IMG_SIZE: "960"
+      # Keep a confirmed anonymous ID through a short real-world occlusion.
+      TRACK_CONFIRMATION_MAX_GAP_S: "5.0"
+      TRACKER_CONFIG: /service/app/sentinel_bytetrack.yaml
+      # Independent local COCO person confirmation for marginal YOLO claims.
+      # It never receives camera data outside this GPU container.
+      ENABLE_PERSON_VERIFIER: "true"
+      PERSON_VERIFIER_CACHE_DIR: /models/person-verifier
+      PERSON_VERIFIER_MAX_YOLO_CONFIDENCE: "0.85"
+      # The independent verifier remains a precision guard, but the camera
+      # often presents a second person at a smaller scale or with overlap.
+      # These values retain a real person match while avoiding a false veto
+      # merely because its box is tighter than YOLO's box.
+      PERSON_VERIFIER_DETECTION_CONFIDENCE: "0.45"
+      PERSON_VERIFIER_MIN_IOU: "0.15"
+      PERSON_VERIFIER_CACHE_S: "0.75"
+      # Pose is a secondary safety observer. Four checks per second or more
+      # at the live frame rate still satisfies the three-observation fall
+      # rule, while keeping GPU time available for primary YOLO + ByteTrack.
+      FALL_POSE_INTERVAL: "4"

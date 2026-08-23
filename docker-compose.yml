@@ -1,0 +1,473 @@
+services:
+  gateway:
+    image: nginx:1.28.3-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    user: "101:101"
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+      - "127.0.0.1:${TLS_API_PORT:-8443}:8443"
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+    secrets:
+      - tls-ca
+      - gateway-server-cert
+      - gateway-server-key
+      - gateway-api-client-cert
+      - gateway-api-client-key
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file: .env
+    expose: ["8080"]
+    environment:
+      MQTT_PORT: 8883
+      MQTT_TLS_ENABLED: "true"
+      MQTT_CA_CERT: /run/secrets/tls-ca
+      MQTT_CLIENT_CERT: /run/secrets/api-mqtt-client-cert
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/secrets/tls-ca
+      PGSSLCERT: /run/secrets/api-postgres-client-cert
+      PGSSLKEY: /run/secrets/api-postgres-client-key
+    depends_on:
+      postgis:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    volumes:
+      - ./evidence:/evidence:ro
+      - ./config:/config:rw
+      - api_state:/var/lib/sentinel
+    secrets:
+      - jwt-signing-key
+      - source: auth-users
+        target: auth-users.json
+      - source: service-credentials
+        target: service-credentials.json
+      - evidence-encryption-key
+      - tls-ca
+      - api-server-cert
+      - api-server-key
+      - api-health-client-cert
+      - api-health-client-key
+      - api-mqtt-client-cert
+      - api-mqtt-client-key
+      - api-postgres-client-cert
+      - api-postgres-client-key
+    networks: [edge, services, data, transport]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request; c=ssl.create_default_context(cafile='/run/secrets/tls-ca'); c.load_cert_chain('/run/secrets/api-health-client-cert','/run/secrets/api-health-client-key'); urllib.request.urlopen('https://api:8080/readyz',context=c,timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  evidence-retention:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: ["sh", "-c", "cp /run/secrets/retention-postgres-client-key /tmp/postgres-client-key && chmod 600 /tmp/postgres-client-key && PGSSLKEY=/tmp/postgres-client-key python -m app.retention_worker"]
+    env_file: .env
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/secrets/tls-ca
+      PGSSLCERT: /run/secrets/retention-postgres-client-cert
+      PGSSLKEY: /run/secrets/retention-postgres-client-key
+    depends_on:
+      postgis:
+        condition: service_healthy
+    volumes:
+      - ./evidence:/evidence
+    secrets:
+      - tls-ca
+      - retention-postgres-client-cert
+      - retention-postgres-client-key
+    networks: [data]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/readyz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  postgis:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgis
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    secrets:
+      - tls-ca
+      - postgres-server-cert
+      - postgres-server-key
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mqtt:
+    build:
+      context: .
+      dockerfile: Dockerfile.mqtt
+    ports:
+      - "127.0.0.1:${MQTT_PORT:-8883}:8883"
+    volumes:
+      - mqtt_data:/mosquitto/data
+    secrets:
+      - tls-ca
+      - mqtt-server-cert
+      - mqtt-server-key
+      - mqtt-health-client-cert
+      - mqtt-health-client-key
+    networks: [transport]
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "mqtt", "-p", "8883", "--cafile", "/run/secrets/tls-ca", "--cert", "/run/secrets/mqtt-health-client-cert", "--key", "/run/secrets/mqtt-health-client-key", "-t", "sentinel/healthcheck", "-m", "alive", "-q", "0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  vision:
+    profiles: ["vision"]
+    build:
+      context: .
+      dockerfile: Dockerfile.vision
+    env_file: .env
+    environment:
+      API_URL: https://api:8080
+      SERVICE_CLIENT_ID: vision
+      SERVICE_CLIENT_SECRET_FILE: /run/secrets/vision-client-secret
+      SERVICE_CA_CERT: /run/secrets/tls-ca
+      SERVICE_CLIENT_CERT: /run/secrets/vision-api-client-cert
+      SERVICE_CLIENT_KEY: /run/secrets/vision-api-client-key
+      # Docker Desktop cannot necessarily route to a phone's Wi-Fi address.
+      # The Windows MJPEG bridge supplies this host-visible endpoint.
+      VIDEO_SOURCE: ${VISION_VIDEO_SOURCE:?Set VISION_VIDEO_SOURCE in .env with the MJPEG bridge token}
+      YOLO_CONFIG_DIR: /tmp
+    volumes:
+      # Keep inference weights on the dedicated model volume.  On this
+      # workstation MODEL_ROOT points to D:/fpv/models, so UI/deployment
+      # copies never duplicate or overwrite the approved local models.
+      - ${MODEL_ROOT:-./models}:/models:ro
+      - ./evidence:/evidence
+    secrets:
+      - vision-client-secret
+      - evidence-encryption-key
+      - tls-ca
+      - vision-api-client-cert
+      - vision-api-client-key
+    networks: [services]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/readyz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  telemetry:
+    profiles: ["telemetry"]
+    build:
+      context: .
+      dockerfile: Dockerfile.vision
+    command: python -m app.mavlink_bridge
+    env_file: .env
+    environment:
+      API_URL: https://api:8080
+      SERVICE_CLIENT_ID: telemetry
+      SERVICE_CLIENT_SECRET_FILE: /run/secrets/telemetry-client-secret
+      SERVICE_CA_CERT: /run/secrets/tls-ca
+      SERVICE_CLIENT_CERT: /run/secrets/telemetry-api-client-cert
+      SERVICE_CLIENT_KEY: /run/secrets/telemetry-api-client-key
+    secrets:
+      - telemetry-client-secret
+      - tls-ca
+      - telemetry-api-client-cert
+      - telemetry-api-client-key
+    networks: [services]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/readyz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  v2x:
+    profiles: ["v2x"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: python -m app.v2x_bridge
+    env_file: .env
+    environment:
+      API_URL: https://api:8080
+      SERVICE_CLIENT_ID: v2x
+      SERVICE_CLIENT_SECRET_FILE: /run/secrets/v2x-client-secret
+      SERVICE_CA_CERT: /run/secrets/tls-ca
+      SERVICE_CLIENT_CERT: /run/secrets/v2x-api-client-cert
+      SERVICE_CLIENT_KEY: /run/secrets/v2x-api-client-key
+      MQTT_PORT: 8883
+      MQTT_TLS_ENABLED: "true"
+      MQTT_CA_CERT: /run/secrets/tls-ca
+      MQTT_CLIENT_CERT: /run/secrets/v2x-mqtt-client-cert
+      MQTT_CLIENT_KEY: /run/secrets/v2x-mqtt-client-key
+    secrets:
+      - v2x-client-secret
+      - tls-ca
+      - v2x-api-client-cert
+      - v2x-api-client-key
+      - v2x-mqtt-client-cert
+      - v2x-mqtt-client-key
+    networks: [services, transport]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/readyz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["ops"]
+    image: prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.wal-compression
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:${OPS_PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    secrets:
+      - tls-ca
+      - prometheus-api-client-cert
+      - prometheus-api-client-key
+    networks: [services, observability]
+    depends_on:
+      api:
+        condition: service_healthy
+      alertmanager:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  alertmanager:
+    profiles: ["ops"]
+    image: prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:${OPS_ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks: [observability]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  grafana:
+    profiles: ["ops"]
+    image: grafana/grafana:13.1.0@sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63
+    environment:
+      GF_SECURITY_ADMIN_USER: sentinel-admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin-password
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ENABLE_GZIP: "true"
+    ports:
+      - "127.0.0.1:${OPS_GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    secrets:
+      - grafana-admin-password
+    networks: [observability]
+    depends_on:
+      prometheus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  api_state:
+  postgis_data:
+  mqtt_data:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
+
+networks:
+  edge:
+  services:
+  data:
+    internal: true
+  transport:
+    internal: true
+  observability: {}
+
+secrets:
+  jwt-signing-key:
+    file: ./secrets/jwt-signing-key
+  auth-users:
+    file: ./secrets/auth-users.json
+  service-credentials:
+    file: ./secrets/service-credentials.json
+  vision-client-secret:
+    file: ./secrets/vision-client-secret
+  telemetry-client-secret:
+    file: ./secrets/telemetry-client-secret
+  v2x-client-secret:
+    file: ./secrets/v2x-client-secret
+  evidence-encryption-key:
+    file: ./secrets/evidence-encryption-key
+  tls-ca:
+    file: ./secrets/tls/ca-cert.pem
+  gateway-server-cert:
+    file: ./secrets/tls/gateway-server-cert.pem
+  gateway-server-key:
+    file: ./secrets/tls/gateway-server-key.pem
+  gateway-api-client-cert:
+    file: ./secrets/tls/gateway-api-client-cert.pem
+  gateway-api-client-key:
+    file: ./secrets/tls/gateway-api-client-key.pem
+  api-server-cert:
+    file: ./secrets/tls/api-server-cert.pem
+  api-server-key:
+    file: ./secrets/tls/api-server-key.pem
+  api-health-client-cert:
+    file: ./secrets/tls/api-health-client-cert.pem
+  api-health-client-key:
+    file: ./secrets/tls/api-health-client-key.pem
+  vision-api-client-cert:
+    file: ./secrets/tls/vision-api-client-cert.pem
+  vision-api-client-key:
+    file: ./secrets/tls/vision-api-client-key.pem
+  telemetry-api-client-cert:
+    file: ./secrets/tls/telemetry-api-client-cert.pem
+  telemetry-api-client-key:
+    file: ./secrets/tls/telemetry-api-client-key.pem
+  v2x-api-client-cert:
+    file: ./secrets/tls/v2x-api-client-cert.pem
+  v2x-api-client-key:
+    file: ./secrets/tls/v2x-api-client-key.pem
+  api-mqtt-client-cert:
+    file: ./secrets/tls/api-mqtt-client-cert.pem
+  api-mqtt-client-key:
+    file: ./secrets/tls/api-mqtt-client-key.pem
+  v2x-mqtt-client-cert:
+    file: ./secrets/tls/v2x-mqtt-client-cert.pem
+  v2x-mqtt-client-key:
+    file: ./secrets/tls/v2x-mqtt-client-key.pem
+  mqtt-server-cert:
+    file: ./secrets/tls/mqtt-server-cert.pem
+  mqtt-server-key:
+    file: ./secrets/tls/mqtt-server-key.pem
+  mqtt-health-client-cert:
+    file: ./secrets/tls/mqtt-health-client-cert.pem
+  mqtt-health-client-key:
+    file: ./secrets/tls/mqtt-health-client-key.pem
+  postgres-server-cert:
+    file: ./secrets/tls/postgres-server-cert.pem
+  postgres-server-key:
+    file: ./secrets/tls/postgres-server-key.pem
+  api-postgres-client-cert:
+    file: ./secrets/tls/api-postgres-client-cert.pem
+  api-postgres-client-key:
+    file: ./secrets/tls/api-postgres-client-key.pem
+  retention-postgres-client-cert:
+    file: ./secrets/tls/retention-postgres-client-cert.pem
+  retention-postgres-client-key:
+    file: ./secrets/tls/retention-postgres-client-key.pem
+  prometheus-api-client-cert:
+    file: ./secrets/tls/prometheus-api-client-cert.pem
+  prometheus-api-client-key:
+    file: ./secrets/tls/prometheus-api-client-key.pem
+  grafana-admin-password:
+    file: ./secrets/grafana-admin-password

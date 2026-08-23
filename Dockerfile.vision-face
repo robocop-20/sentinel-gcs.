@@ -1,0 +1,19 @@
+FROM python:3.11-slim@sha256:a630a63cdb314e2d138a2fca3e375e319e8568346ffafac5b980f888630ac4f1 AS builder
+WORKDIR /service
+COPY requirements-vision.txt requirements-face.txt ./
+RUN python -m pip install --no-cache-dir --prefix=/install \
+    --index-url https://pypi.org/simple --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch==2.10.0+cpu torchvision==0.25.0+cpu \
+    -r requirements-vision.txt -r requirements-face.txt
+
+FROM python:3.11-slim@sha256:a630a63cdb314e2d138a2fca3e375e319e8568346ffafac5b980f888630ac4f1 AS runtime
+WORKDIR /service
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends libgl1 libglib2.0-0 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin sentinel
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/tmp/sentinel YOLO_CONFIG_DIR=/tmp/Ultralytics
+COPY --from=builder /install /usr/local
+COPY --chown=sentinel:sentinel app ./app
+USER 10001:10001
+CMD ["python", "-m", "app.vision_worker"]

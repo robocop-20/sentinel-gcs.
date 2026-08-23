@@ -1,0 +1,7 @@
+# Local overlay for a source-only vision-worker update.
+# It deliberately reuses the already-installed CUDA runtime image so routine
+# application changes never trigger a multi-gigabyte torch/CUDA download.
+FROM fpv-vision-gpu:latest
+USER root
+COPY --chown=sentinel:sentinel app/vision_worker.py /service/app/vision_worker.py
+USER 10001:10001

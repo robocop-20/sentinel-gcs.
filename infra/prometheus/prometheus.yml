@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+  external_labels:
+    system: sentinel-ground-station
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: sentinel-api
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8080"]
+    tls_config:
+      ca_file: /run/secrets/tls-ca
+      cert_file: /run/secrets/prometheus-api-client-cert
+      key_file: /run/secrets/prometheus-api-client-key
+      server_name: api
+      insecure_skip_verify: false
+

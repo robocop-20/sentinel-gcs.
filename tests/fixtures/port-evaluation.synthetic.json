@@ -1,0 +1,16 @@
+{
+  "schema": "sentinel-port-evaluation/1",
+  "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "dataset_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "overall": {"precision": 0.95, "recall": 0.90, "map50": 0.94, "map50_95": 0.70},
+  "per_class": {
+    "precision": {"person": 0.92, "vessel": 0.93, "vehicle": 0.94, "container": 0.91},
+    "recall": {"person": 0.86, "vessel": 0.87, "vehicle": 0.88, "container": 0.85},
+    "map50_95": {"person": 0.62, "vessel": 0.63, "vehicle": 0.64, "container": 0.61}
+  },
+  "background_negatives": {
+    "image_count": 100,
+    "false_positives_per_image": 0.01,
+    "false_positive_image_rate": 0.01
+  }
+}

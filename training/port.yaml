@@ -1,0 +1,11 @@
+# Port-surveillance training contract for a custom YOLO11 detector.
+# Place images and YOLO txt labels under training/datasets/port before training.
+path: training/datasets/port
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: person
+  1: vessel
+  2: vehicle
+  3: container

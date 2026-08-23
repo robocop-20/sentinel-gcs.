@@ -1,0 +1,10 @@
+# Torch and TorchVision are installed from the official CPU wheel index in
+# Dockerfile.vision.  Keeping them out of this file prevents pip resolving a
+# CUDA runtime when the initial deployment is CPU-only.
+ultralytics==8.4.120
+lap==0.5.13
+opencv-python-headless==4.14.0.94
+requests==2.34.2
+cryptography==49.0.0
+pydantic==2.13.4
+pymavlink==2.4.49

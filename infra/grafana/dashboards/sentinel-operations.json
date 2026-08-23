@@ -1,0 +1,28 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {"type":"stat","title":"Service Availability","id":1,"gridPos":{"x":0,"y":0,"w":8,"h":5},"targets":[{"expr":"sentinel_service_up","legendFormat":"{{service}}","refId":"A"}],"fieldConfig":{"defaults":{"mappings":[{"type":"value","options":{"0":{"text":"DOWN","color":"red"},"1":{"text":"UP","color":"green"}}}],"thresholds":{"mode":"absolute","steps":[{"color":"red","value":null},{"color":"green","value":1}]}},"overrides":[]},"options":{"colorMode":"background","graphMode":"none","justifyMode":"auto","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"auto","wideLayout":true}},
+    {"type":"stat","title":"Inference p95 (ms)","id":2,"gridPos":{"x":8,"y":0,"w":4,"h":5},"targets":[{"expr":"histogram_quantile(0.95, sum by (le) (rate(sentinel_vision_inference_latency_ms_bucket[5m])))","refId":"A"}],"fieldConfig":{"defaults":{"unit":"ms","thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":75},{"color":"red","value":100}]}},"overrides":[]}},
+    {"type":"stat","title":"End-to-alert p95","id":3,"gridPos":{"x":12,"y":0,"w":4,"h":5},"targets":[{"expr":"histogram_quantile(0.95, sum by (le) (rate(sentinel_event_to_alert_latency_seconds_bucket[5m])))","refId":"A"}],"fieldConfig":{"defaults":{"unit":"s","thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":0.1},{"color":"red","value":0.25}]}},"overrides":[]}},
+    {"type":"stat","title":"Dead Letters","id":4,"gridPos":{"x":16,"y":0,"w":4,"h":5},"targets":[{"expr":"sentinel_mqtt_dead_letters","refId":"A"}],"fieldConfig":{"defaults":{"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"red","value":1}]}},"overrides":[]}},
+    {"type":"stat","title":"Track-ID Churn","id":5,"gridPos":{"x":20,"y":0,"w":4,"h":5},"targets":[{"expr":"sum(rate(sentinel_track_ids_created_total[5m])) / clamp_min(sum(rate(sentinel_track_observations_total[5m])), 0.001)","refId":"A"}],"fieldConfig":{"defaults":{"unit":"percentunit","thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":0.2},{"color":"red","value":0.3}]}},"overrides":[]}},
+    {"type":"timeseries","title":"Vision Throughput","id":6,"gridPos":{"x":0,"y":5,"w":12,"h":8},"targets":[{"expr":"sentinel_vision_capture_fps","legendFormat":"capture {{source}}","refId":"A"},{"expr":"sentinel_vision_inference_fps","legendFormat":"inference {{source}}","refId":"B"}],"fieldConfig":{"defaults":{"unit":"fps"},"overrides":[]}},
+    {"type":"timeseries","title":"Vision Latency Quantiles","id":7,"gridPos":{"x":12,"y":5,"w":12,"h":8},"targets":[{"expr":"histogram_quantile(0.50, sum by (le) (rate(sentinel_vision_end_to_end_latency_ms_bucket[5m])))","legendFormat":"p50","refId":"A"},{"expr":"histogram_quantile(0.95, sum by (le) (rate(sentinel_vision_end_to_end_latency_ms_bucket[5m])))","legendFormat":"p95","refId":"B"},{"expr":"histogram_quantile(0.99, sum by (le) (rate(sentinel_vision_end_to_end_latency_ms_bucket[5m])))","legendFormat":"p99","refId":"C"}],"fieldConfig":{"defaults":{"unit":"ms"},"overrides":[]}},
+    {"type":"timeseries","title":"Queue Depth","id":8,"gridPos":{"x":0,"y":13,"w":8,"h":8},"targets":[{"expr":"sentinel_queue_depth","legendFormat":"{{layer}}","refId":"A"}],"fieldConfig":{"defaults":{"min":0},"overrides":[]}},
+    {"type":"timeseries","title":"Oldest Durable Record","id":9,"gridPos":{"x":8,"y":13,"w":8,"h":8},"targets":[{"expr":"sentinel_outbox_oldest_age_seconds","legendFormat":"{{channel}}","refId":"A"}],"fieldConfig":{"defaults":{"unit":"s","min":0},"overrides":[]}},
+    {"type":"timeseries","title":"Event Rate by Severity","id":10,"gridPos":{"x":16,"y":13,"w":8,"h":8},"targets":[{"expr":"sum by (severity) (rate(sentinel_events_total[5m]))","legendFormat":"{{severity}}","refId":"A"}],"fieldConfig":{"defaults":{"unit":"eps"},"overrides":[]}},
+    {"type":"timeseries","title":"LLM Advisory Latency","id":11,"gridPos":{"x":0,"y":21,"w":12,"h":8},"targets":[{"expr":"histogram_quantile(0.95, sum by (le, provider) (rate(sentinel_llm_review_latency_seconds_bucket[15m])))","legendFormat":"p95 {{provider}}","refId":"A"}],"fieldConfig":{"defaults":{"unit":"s"},"overrides":[]}},
+    {"type":"timeseries","title":"Frame Drop Ratio","id":12,"gridPos":{"x":12,"y":21,"w":12,"h":8},"targets":[{"expr":"sum by (source) (rate(sentinel_vision_frames_total{stage=\"dropped\"}[5m])) / clamp_min(sum by (source) (rate(sentinel_vision_frames_total{stage=\"captured\"}[5m])), 0.001)","legendFormat":"{{source}}","refId":"A"}],"fieldConfig":{"defaults":{"unit":"percentunit","min":0,"max":1},"overrides":[]}}
+  ],
+  "refresh": "5s",
+  "schemaVersion": 42,
+  "tags": ["sentinel", "engineering", "sla"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timezone": "browser",
+  "title": "Sentinel Engineering Operations",
+  "uid": "sentinel-engineering-ops",
+  "version": 1
+}

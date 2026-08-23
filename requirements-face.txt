@@ -1,0 +1,3 @@
+# YuNet face observation is implemented by OpenCV DNN, already pinned in
+# requirements-vision.txt. Intentionally no embedding, gallery, recognition,
+# ArcFace, InsightFace, or biometric identity dependency is installed.

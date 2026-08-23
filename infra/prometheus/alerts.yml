@@ -1,0 +1,68 @@
+groups:
+  - name: sentinel-operational-sla
+    rules:
+      - alert: SentinelServiceUnavailable
+        expr: sentinel_service_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Sentinel service {{ $labels.service }} is unavailable"
+          runbook: "SECURITY_OPERATIONS.md#health-semantics"
+
+      - alert: SentinelVisionP95LatencyHigh
+        expr: histogram_quantile(0.95, sum by (le, source) (rate(sentinel_vision_end_to_end_latency_ms_bucket[5m]))) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Vision p95 end-to-end latency exceeds 100 ms"
+
+      - alert: SentinelFrameDropRateHigh
+        expr: sum by (source) (rate(sentinel_vision_frames_total{stage="dropped"}[5m])) / clamp_min(sum by (source) (rate(sentinel_vision_frames_total{stage="captured"}[5m])), 0.001) > 0.20
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Vision frame replacement/drop rate exceeds 20%"
+
+      - alert: SentinelTrackIdChurnHigh
+        expr: sum(rate(sentinel_track_ids_created_total[5m])) / clamp_min(sum(rate(sentinel_track_observations_total[5m])), 0.001) > 0.30
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Anonymous track-ID churn exceeds 30% of observations"
+
+      - alert: SentinelQueueBackpressure
+        expr: max by (layer) (sentinel_queue_depth) > 400
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pipeline queue {{ $labels.layer }} is under backpressure"
+
+      - alert: SentinelOutboxDeliveryStalled
+        expr: max by (channel) (sentinel_outbox_oldest_age_seconds) > 30
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Durable {{ $labels.channel }} delivery has stalled"
+
+      - alert: SentinelDeadLetterPresent
+        expr: sentinel_mqtt_dead_letters > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical MQTT records require dead-letter review"
+
+      - alert: SentinelCircuitOpen
+        expr: sentinel_circuit_open == 1
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker {{ $labels.component }} is open"
+

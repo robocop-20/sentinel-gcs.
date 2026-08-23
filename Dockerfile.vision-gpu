@@ -1,0 +1,20 @@
+FROM python:3.11-slim@sha256:a630a63cdb314e2d138a2fca3e375e319e8568346ffafac5b980f888630ac4f1 AS builder
+WORKDIR /service
+COPY requirements-vision.txt .
+# CUDA 12.8 wheels are compatible with the installed NVIDIA driver/runtime.
+# Pin matching torch/torchvision builds so GPU inference is reproducible.
+RUN python -m pip install --no-cache-dir --prefix=/install \
+    --index-url https://pypi.org/simple --extra-index-url https://download.pytorch.org/whl/cu128 \
+    torch==2.10.0+cu128 torchvision==0.25.0+cu128 -r requirements-vision.txt
+
+FROM python:3.11-slim@sha256:a630a63cdb314e2d138a2fca3e375e319e8568346ffafac5b980f888630ac4f1 AS runtime
+WORKDIR /service
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends libgl1 libglib2.0-0 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin sentinel
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/tmp/sentinel YOLO_CONFIG_DIR=/tmp/Ultralytics
+COPY --from=builder /install /usr/local
+COPY --chown=sentinel:sentinel app ./app
+USER 10001:10001
+CMD ["python", "-m", "app.vision_worker"]

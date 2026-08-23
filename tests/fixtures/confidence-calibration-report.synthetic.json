@@ -1,0 +1,8 @@
+{
+  "schema": "sentinel-confidence-calibration/1",
+  "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "dataset_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "prediction_count": 1000,
+  "expected_calibration_error": 0.05,
+  "brier_score": 0.12
+}

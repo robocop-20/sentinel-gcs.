@@ -1,0 +1,14 @@
+# Versions are pinned to the dependency set exercised by the local deployment.
+# Hash-locked release artifacts are generated in the release phase (H7).
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+paho-mqtt==2.1.0
+psycopg[binary]==3.3.4
+psycopg-pool==3.3.1
+pydantic==2.13.4
+PyJWT==2.13.0
+argon2-cffi==25.1.0
+python-multipart==0.0.32
+cryptography==49.0.0
+prometheus-client==0.26.0
+requests==2.34.2

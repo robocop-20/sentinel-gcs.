@@ -1,0 +1,2 @@
+# Copy this file to camera-source.txt, then set one HTTP(S) or RTSP(S) source.
+http://192.168.1.100:8080/videofeed

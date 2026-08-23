@@ -1,0 +1,16 @@
+FROM python:3.11-slim@sha256:a630a63cdb314e2d138a2fca3e375e319e8568346ffafac5b980f888630ac4f1 AS builder
+WORKDIR /service
+COPY requirements-api.txt .
+RUN python -m pip install --no-cache-dir --prefix=/install -r requirements-api.txt
+
+FROM python:3.11-slim@sha256:a630a63cdb314e2d138a2fca3e375e319e8568346ffafac5b980f888630ac4f1 AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/home/sentinel/.local/bin:${PATH}"
+WORKDIR /service
+RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin sentinel \
+    && install -d -o sentinel -g sentinel -m 700 /var/lib/sentinel
+COPY --from=builder /install /usr/local
+COPY --chown=sentinel:sentinel app ./app
+COPY --chown=sentinel:sentinel index.html styles.css operations.css app.js ./
+USER 10001:10001
+EXPOSE 8080
+CMD ["python", "-m", "app.start_api"]

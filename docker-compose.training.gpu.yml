@@ -1,0 +1,13 @@
+services:
+  trainer:
+    image: fpv-vision-gpu
+    build:
+      context: .
+      dockerfile: Dockerfile.vision-gpu
+    profiles: ["training"]
+    gpus: all
+    working_dir: /service
+    volumes:
+      - ./training:/service/training
+      - ./models:/models
+    entrypoint: ["python"]

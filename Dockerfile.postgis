@@ -1,0 +1,5 @@
+FROM postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+COPY --chmod=755 infra/postgis-tls-entrypoint.sh /usr/local/bin/sentinel-postgres-entrypoint
+COPY --chmod=644 infra/pg_hba.conf /etc/postgresql/sentinel-pg_hba.conf
+COPY --chmod=644 infra/pg_ident.conf /etc/postgresql/sentinel-pg_ident.conf
+ENTRYPOINT ["/usr/local/bin/sentinel-postgres-entrypoint"]

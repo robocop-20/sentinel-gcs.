@@ -1,0 +1,14 @@
+# Conservative ByteTrack policy for live port/FPV video.
+# Candidate boxes at 0.20 are available only for association.  A new anonymous
+# track still needs 0.45 confidence and three recent observations before it is
+# published to the API, evidence, risk, or V2X layers.
+tracker_type: bytetrack
+track_high_thresh: 0.40
+track_low_thresh: 0.20
+new_track_thresh: 0.45
+# Retain a lost anonymous track long enough for a short exit, occlusion, or
+# turn-back in the same camera. Matching remains deliberately strict: this is
+# continuity of an observation, not person identification.
+track_buffer: 120
+match_thresh: 0.85
+fuse_score: true

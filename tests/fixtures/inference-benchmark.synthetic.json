@@ -1,0 +1,6 @@
+{
+  "schema": "sentinel-inference-benchmark/1",
+  "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "latency_ms": {"p95": 40.0},
+  "throughput_fps": 25.0
+}

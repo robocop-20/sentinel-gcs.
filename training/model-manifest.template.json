@@ -1,0 +1,23 @@
+{
+  "model_name": "port-yolo11",
+  "model_version": "replace-with-version",
+  "created_at_utc": "replace-with-ISO-8601-time",
+  "classes": ["person", "vessel", "vehicle", "container"],
+  "base_model": "yolo11s.pt",
+  "dataset_version": "replace-with-immutable-dataset-version",
+  "dataset_license": "replace-with-dataset-license",
+  "dataset_card_path": "training/datasets/port/DATASET_CARD.md",
+  "dataset_fingerprint_sha256": "replace-with-validator-fingerprint",
+  "validation_metrics": {
+    "precision": null,
+    "recall": null,
+    "map50": null,
+    "map50_95": null,
+    "per_class": {"precision": null, "recall": null, "map50_95": null},
+    "evaluation_report": "training/runs/port-yolo11/evaluation.json",
+    "latency_report": "training/runs/port-yolo11/inference-benchmark.json",
+    "release_gate_report": "training/runs/port-yolo11/release-gate.json"
+  },
+  "validation_notes": "Do not promote without held-out port-camera validation.",
+  "sha256": "replace-with-model-sha256"
+}

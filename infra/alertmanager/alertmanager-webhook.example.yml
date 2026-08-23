@@ -1,0 +1,13 @@
+route:
+  receiver: approved-operations-webhook
+  group_by: [alertname, severity]
+  group_wait: 10s
+  group_interval: 2m
+  repeat_interval: 30m
+
+receivers:
+  - name: approved-operations-webhook
+    webhook_configs:
+      - url_file: /run/secrets/alert-webhook-url
+        send_resolved: true
+

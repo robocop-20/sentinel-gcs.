@@ -1,0 +1,48 @@
+name: sentinel-ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch torchvision
+          python -m pip install --disable-pip-version-check -r requirements-api.txt -r requirements-vision.txt -r requirements-dev.txt
+      - name: Compile
+        run: python -m compileall -q app tests
+      - name: Lint
+        run: ruff check app tests
+      - name: Type-check hardened infrastructure
+        run: >-
+          mypy --strict
+          app/observability.py app/service_health.py app/auth.py
+          app/http_limits.py app/evidence_crypto.py app/durable_queue.py
+          app/mqtt.py app/persistence.py app/resilience.py app/metrics.py
+          app/evidence_integrity.py app/retention_worker.py
+          app/model_release.py app/geofence.py app/schemas.py
+      - name: Unit tests
+        run: python -m pytest -q
+      - name: Static security scan
+        run: bandit -q -r app -x tests -ll
+      - name: Dependency vulnerability scan
+        run: pip-audit -r requirements-api.txt
+
+  container-build:
+    runs-on: ubuntu-latest
+    needs: test-and-audit
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build API image
+        run: docker build --pull=false --file Dockerfile.api --tag sentinel-api:${{ github.sha }} .
