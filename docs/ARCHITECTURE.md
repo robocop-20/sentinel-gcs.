@@ -43,6 +43,26 @@ flowchart LR
 
 Capture and publisher boundaries keep one latest item. Slow consumers replace stale work rather than creating video latency. API storage and MQTT egress use bounded durable queues and isolated circuit breakers.
 
+## Layer ownership and outputs
+
+| Layer | Runtime component | Output | Authority boundary |
+| --- | --- | --- | --- |
+| Video ingest | OpenCV, authenticated Windows MJPEG bridge, RTSP adapter | Timestamped complete frames | Source reachability only; no detection decision |
+| Object perception | YOLO11 | Class, bounding box, model confidence | Candidate observations; not an alert |
+| Object tracking | ByteTrack with temporal confirmation | Anonymous persistent track ID and rolling confidence | Does not establish human identity |
+| Face observation | OpenCV YuNet | Face box, landmarks, quality, anonymous track link | Detection/quality only; no face matching or gallery |
+| Pose and fall review | YOLO pose plus time-window rules | Anonymous pose geometry and possible-fall review event | Deterministic operator-review signal |
+| Sensor ingest | MAVLink GPS/IMU and LiDAR adapter | Timestamped vehicle pose and range | Drops stale or mismatched sensor data |
+| Geolocation | Fusion and calibration profile | Approximate or ray-plane location plus uncertainty state | Never claims calibrated accuracy without validation |
+| Geofence and risk | Rules worker | Explainable zone/risk factors and event severity | Deterministic authority for alerts |
+| Evidence and storage | PostGIS, encrypted evidence store, durable queue | Audit record, evidence manifest, retention state | Isolated from live capture throughput |
+| V2X transport | Signed MQTT/V2X relay | Authenticated event envelope and peer heartbeat | Rejects untrusted/replayed peer data |
+| Scene review | Optional OpenRouter, xAI, or Gemini adapter | Bounded advisory object/scene rationale | Cannot modify detections, tracks, rules, or alerts |
+
+The dashboard renders the outputs of these layers; it is not the source of
+truth. If the browser disconnects, processing, audit storage, and deterministic
+event handling continue within their own service boundaries.
+
 ## Correlation and provenance
 
 `DetectionBatch.batch_id` is the frame correlation identifier. It follows detections into tracks and events. Event provenance records detector name/version/weights hash, camera and vehicle, source-frame time, calibration/extrinsics versions and hashes, geofence version, evidence ID/hash, and human review data. UTC epoch timestamps are persisted; monotonic clocks are used for process durations and retry windows.

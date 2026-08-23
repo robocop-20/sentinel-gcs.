@@ -41,6 +41,26 @@ datasets, and generated outputs are ignored. Runtime model weights are stored
 in the private repository through Git LFS; run `git lfs pull` after cloning.
 See [models/README.md](models/README.md) for the approved model bundle.
 
+### Architecture at a glance
+
+```text
+Authorised camera ──> OpenCV ingest ──> YOLO11 ──> ByteTrack ──> Fusion
+                                                   │               │
+                  Optional face / pose observation ┘               v
+MAVLink GPS/IMU + LiDAR ───────────────────────────────> Geolocation
+                                                            │
+                                                            v
+                                             Geofence + deterministic risk rules
+                                                            │
+                 ┌─────────────── PostGIS / evidence / UI / MQTT / signed V2X
+                 v
+        Optional external scene reviewer (advisory only; cannot control alerts)
+```
+
+Read the full [system architecture](docs/ARCHITECTURE.md) for service trust
+boundaries, data contracts, resilience behaviour, and the responsibility of
+each layer.
+
 This is a deterministic, backend-first FPV security processing system. It is ready for a real RTSP/IP camera URL or a Windows USB capture source; no UI configuration is required to start the processing services.
 
 The system is being engineered toward high-assurance operational rigour; it is
