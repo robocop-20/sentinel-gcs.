@@ -63,6 +63,117 @@ The dashboard renders the outputs of these layers; it is not the source of
 truth. If the browser disconnects, processing, audit storage, and deterministic
 event handling continue within their own service boundaries.
 
+## Detailed end-to-end execution flow
+
+```mermaid
+flowchart TD
+  classDef source fill:#203244,stroke:#6d9fc4,color:#f5f7fa
+  classDef compute fill:#24302a,stroke:#5b9c6e,color:#f5f7fa
+  classDef rule fill:#382f22,stroke:#c98a3c,color:#f5f7fa
+  classDef store fill:#2b2937,stroke:#8f80bd,color:#f5f7fa
+  classDef advisory fill:#313039,stroke:#8f80bd,color:#f5f7fa,stroke-dasharray: 5 4
+  classDef reject fill:#3b2828,stroke:#b6503f,color:#f5f7fa
+
+  subgraph Inputs[Authorised input adapters]
+    Camera[IP camera / RTSP / USB capture]:::source
+    Bridge[Windows authenticated MJPEG bridge\nlatest complete frame only]:::source
+    Flight[Flight controller or simulator]:::source
+    Range[LiDAR / range sensor]:::source
+    Camera --> Bridge
+  end
+
+  subgraph Perception[Perception service]
+    Decode[OpenCV decode, rotation, frame timestamp]:::compute
+    Quality{Complete current frame?}:::rule
+    Detect[YOLO11 object inference\nclass, box, raw confidence]:::compute
+    Track[ByteTrack association\nanonymous persistent ID]:::compute
+    Confirm{Class and temporal\nconfirmation threshold met?}:::rule
+    Face[Optional YuNet face observation\nbox, landmarks, quality only]:::compute
+    Pose[Optional pose / fall observation\nanonymous geometry only]:::compute
+    RejectFrame[Drop stale, incomplete,\nor unconfirmed observation]:::reject
+    Bridge --> Decode --> Quality
+    Quality -- no --> RejectFrame
+    Quality -- yes --> Detect --> Track --> Confirm
+    Confirm -- no --> RejectFrame
+    Confirm -- yes --> Face
+    Confirm -- yes --> Pose
+  end
+
+  subgraph Fusion[Fusion and location]
+    Batch[Typed DetectionBatch\nframe correlation ID]:::compute
+    Telemetry[MAVLink telemetry\nGPS, IMU, altitude, time]:::source
+    Fresh{Nearest telemetry and range\nwithin freshness windows?}:::rule
+    Project[Approximate flat-ground or\nvalidated ray-plane projection]:::compute
+    NoLocation[Keep detection without\nderived location]:::reject
+    Detect --> Batch
+    Track --> Batch
+    Face -. observation metadata .-> Batch
+    Pose -. pose metadata .-> Batch
+    Flight --> Telemetry
+    Range --> Fresh
+    Telemetry --> Fresh
+    Batch --> Fresh
+    Fresh -- yes --> Project
+    Fresh -- no --> NoLocation
+  end
+
+  subgraph Deterministic[Deterministic authority boundary]
+    RuleInput[Processed track + optional location]:::compute
+    Fence[Geofence transition check]:::rule
+    Risk[Explainable risk score\nclass, confidence, time, zone]:::rule
+    Event{Event rule satisfied?}:::rule
+    NoEvent[Track state update only]:::compute
+    SecurityEvent[Versioned security event\nNEW / ACKNOWLEDGED / RESOLVED]:::rule
+    Project --> RuleInput
+    NoLocation --> RuleInput
+    RuleInput --> Fence --> Risk --> Event
+    Event -- no --> NoEvent
+    Event -- yes --> SecurityEvent
+  end
+
+  subgraph Durable[Durable storage and transport]
+    Queue[Bounded durable queues\nretry, idempotency, circuit breakers]:::store
+    DB[(PostGIS\ntracks, events, missions)]:::store
+    Evidence[Encrypted evidence store\nmanifest and retention policy]:::store
+    MQTT[Authenticated MQTT broker]:::store
+    V2X[Signed V2X relay\npeer allow-list and replay checks]:::store
+    SecurityEvent --> Queue
+    NoEvent --> Queue
+    Queue --> DB
+    Queue --> Evidence
+    Queue --> MQTT --> V2X
+  end
+
+  subgraph Operator[Operator and advisory boundary]
+    API[FastAPI operations API]:::compute
+    UI[React Sentinel GCS\nread-only live status and review]:::source
+    Crop[Operator-approved bounded\nnon-identity object crop]:::advisory
+    LLM[Optional external scene reviewer\nstructured recommendation]:::advisory
+    Advice[AI ADVISORY queue\noperator review required]:::advisory
+    DB --> API
+    Evidence --> API
+    API --> UI
+    SecurityEvent -. eligible review only .-> Crop --> LLM --> Advice --> API
+  end
+
+  LLM -.-x Detect
+  LLM -.-x Track
+  LLM -.-x Risk
+  LLM -.-x SecurityEvent
+
+  class Camera,Bridge,Flight,Range,Telemetry source
+  class Decode,Detect,Track,Face,Pose,Batch,Project,RuleInput,NoEvent,API compute
+  class Quality,Confirm,Fresh,Fence,Risk,Event,SecurityEvent rule
+  class Queue,DB,Evidence,MQTT,V2X store
+  class Crop,LLM,Advice advisory
+  class RejectFrame,NoLocation reject
+```
+
+The dashed crossed lines are intentional: an external adviser has no write path
+to detector output, tracker state, deterministic risk evaluation, or event
+activation. An operator may use an advisory result as extra context during
+review, but deterministic services remain the source of operational truth.
+
 ## Correlation and provenance
 
 `DetectionBatch.batch_id` is the frame correlation identifier. It follows detections into tracks and events. Event provenance records detector name/version/weights hash, camera and vehicle, source-frame time, calibration/extrinsics versions and hashes, geofence version, evidence ID/hash, and human review data. UTC epoch timestamps are persisted; monotonic clocks are used for process durations and retry windows.
