@@ -43,18 +43,29 @@ See [models/README.md](models/README.md) for the approved model bundle.
 
 ### Architecture at a glance
 
-```text
-Authorised camera ──> OpenCV ingest ──> YOLO11 ──> ByteTrack ──> Fusion
-                                                   │               │
-                  Optional face / pose observation ┘               v
-MAVLink GPS/IMU + LiDAR ───────────────────────────────> Geolocation
-                                                            │
-                                                            v
-                                             Geofence + deterministic risk rules
-                                                            │
-                 ┌─────────────── PostGIS / evidence / UI / MQTT / signed V2X
-                 v
-        Optional external scene reviewer (advisory only; cannot control alerts)
+```mermaid
+flowchart LR
+  Camera[Authorised camera] --> Capture[OpenCV capture]
+  Capture --> YOLO[YOLO11 detection]
+  YOLO --> Track[ByteTrack anonymous IDs]
+  Track --> Fusion[Sensor fusion]
+  Sensors[MAVLink GPS/IMU + LiDAR] --> Fusion
+  YOLO -. optional observation .-> Face[Face / pose quality]
+  Face -. metadata only .-> Fusion
+  Fusion --> Geo[Geolocation]
+  Geo --> Rules[Geofence + deterministic risk rules]
+  Rules --> Outputs[PostGIS · evidence · UI · MQTT · signed V2X]
+  Rules -. approved context only .-> Adviser[Optional scene adviser]
+  Adviser -. recommendation only .-> Review[Operator review]
+
+  classDef input fill:#203244,stroke:#6d9fc4,color:#f5f7fa
+  classDef compute fill:#24302a,stroke:#5b9c6e,color:#f5f7fa
+  classDef rule fill:#382f22,stroke:#c98a3c,color:#f5f7fa
+  classDef advisory fill:#313039,stroke:#8f80bd,color:#f5f7fa,stroke-dasharray: 5 4
+  class Camera,Sensors input
+  class Capture,YOLO,Track,Fusion,Geo,Face,Outputs compute
+  class Rules rule
+  class Adviser,Review advisory
 ```
 
 Read the full [system architecture](docs/ARCHITECTURE.md) for service trust
