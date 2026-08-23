@@ -4,18 +4,30 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 from pathlib import Path
+
+
+_private_key_dir: Path | None = None
+
+
+def _get_private_key_dir() -> Path:
+    """Create one owner-only, process-specific writable directory for TLS keys."""
+    global _private_key_dir
+    if _private_key_dir is None:
+        _private_key_dir = Path(tempfile.mkdtemp(prefix="sentinel-tls-"))
+        _private_key_dir.chmod(0o700)
+    return _private_key_dir
 
 
 def private_copy(source: str, name: str) -> str:
     source_path = Path(source)
     if not source_path.is_file():
         raise SystemExit(f"Required TLS private key is missing: {source_path}")
-    # Services run with read-only root filesystems. Their writable /tmp tmpfs
-    # is deliberately the only place private-key material may be copied for
-    # the strict permission checks used by OpenSSL/libpq.
-    target_dir = Path("/tmp/sentinel-tls")
-    target_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Services run with read-only root filesystems. A secure process-specific
+    # temporary directory is the only place private-key material may be copied
+    # for the strict permission checks used by OpenSSL/libpq.
+    target_dir = _get_private_key_dir()
     target = target_dir / name
     shutil.copyfile(source_path, target)
     target.chmod(0o600)
