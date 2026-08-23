@@ -163,7 +163,8 @@ def test_d_backend_deployment_preserves_models_and_runtime_data():
     assert "D:\\fpv" in deployment
     assert "'app', 'infra', 'db', 'scripts', 'secrets'" in deployment
     assert "models" not in deployment.split("$rootFiles =", 1)[1].split(")", 1)[0]
-    assert "Models, evidence, camera source, .env" in deployment
+    assert "D owns models, evidence, camera source" in deployment
+    assert ".env, secrets/credentials" in deployment
     assert "--remove-orphans" in deployment
 
 

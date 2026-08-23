@@ -1,3 +1,5 @@
+import pytest
+
 from app.geolocation import estimate_location
 from app.schemas import Telemetry
 
@@ -33,7 +35,7 @@ def test_uncalibrated_location_is_explicitly_unbounded_and_timestamped():
     assert result.approximate is True
     assert result.uncertainty_m is None
     assert result.uncertainty_status == "UNBOUNDED"
-    assert result.synchronization_delta_s == 0.4
+    assert result.synchronization_delta_s == pytest.approx(0.4)
 
 
 def test_ray_plane_mode_does_not_use_invalid_attitude():
