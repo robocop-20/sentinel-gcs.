@@ -9,6 +9,6 @@ pydantic==2.13.4
 PyJWT==2.13.0
 argon2-cffi==25.1.0
 python-multipart==0.0.32
-cryptography==49.0.0
+cryptography==50.0.0
 prometheus-client==0.26.0
 requests==2.34.2
