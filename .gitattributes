@@ -1,0 +1,6 @@
+# Runtime model weights are stored as Git LFS objects rather than ordinary Git
+# blobs. This keeps clone history usable while allowing an approved private
+# team to retrieve the exact local model bundle.
+models/*.pt filter=lfs diff=lfs merge=lfs -text
+models/**/*.onnx filter=lfs diff=lfs merge=lfs -text
+models/**/*.pth filter=lfs diff=lfs merge=lfs -text
