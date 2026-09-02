@@ -6,14 +6,17 @@ param(
     [ValidateRange(320, 1920)]
     [int]$ImageSize = 960,
 
+    # Benchmarked on the local 4 GB RTX 2050: batch 2 gives higher image
+    # throughput than batch 4 while staying within the available VRAM.
     [ValidateRange(1, 16)]
-    [int]$Batch = 4
+    [int]$Batch = 2
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSCommandPath
 $docker = 'D:\Docker\Desktop\resources\bin\docker.exe'
 $datasetRoot = Join-Path $projectRoot 'training\datasets\port'
+$runRoot = Join-Path $projectRoot 'training\runs\port-yolo11'
 
 if (-not (Test-Path -LiteralPath $docker -PathType Leaf)) {
     throw "Docker Desktop executable was not found at $docker"
@@ -21,6 +24,10 @@ if (-not (Test-Path -LiteralPath $docker -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath (Join-Path $datasetRoot 'images\train') -PathType Container)) {
     throw "Port training images are missing. Put labelled images and YOLO .txt labels under $datasetRoot before starting training."
 }
+
+# The validator writes its integrity report before training starts. Create the
+# candidate-run directory here so a first run never fails solely due to output setup.
+New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 
 $compose = @(
     'compose',
@@ -36,7 +43,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Dataset validation failed. Training was not st
 
 Write-Host '2/4 Training on GPU 0...' -ForegroundColor Cyan
 & $docker @compose 'run' '--rm' 'trainer' 'training/train_port_model.py' `
-    '--base-model' '/models/yolo11s.pt' '--device' '0' '--epochs' $Epochs '--imgsz' $ImageSize '--batch' $Batch
+    '--base-model' '/models/yolo11s.pt' '--device' '0' '--epochs' $Epochs '--imgsz' $ImageSize '--batch' $Batch `
+    '--project' '/service/training/runs' '--workers' '0' '--skip-validation' '--stage-dataset'
 if ($LASTEXITCODE -ne 0) { throw 'Training failed. The current deployed model was not changed.' }
 
 $candidate = 'training/runs/port-yolo11/weights/best.pt'

@@ -977,7 +977,7 @@ async def capabilities():
                 "component": "YOLO11 GPU inference",
                 "state": vision_status,
                 "classes": ["person", "vessel", "vehicle"],
-                "optional_custom_class": "container requires a validated port model",
+                "optional_maritime_classes": "small_boat and cargo_vessel require a validated port model",
             },
             {
                 "id": "tracking",

@@ -14,7 +14,7 @@ except ImportError:  # Direct script execution from the repository root.
     from analyze_confidence import analyze_records, render_svg
 
 
-CLASS_NAMES = ["person", "vessel", "vehicle", "container"]
+CLASS_NAMES = ["small_boat", "cargo_vessel"]
 
 
 def _iou(first: list[float], second: list[float]) -> float:

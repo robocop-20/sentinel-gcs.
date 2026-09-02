@@ -14,10 +14,10 @@ Do not include identities, face crops, or private credentials.
 
 - Cameras, locations, and collection dates:
 - Day/night, weather, glare, occlusion, range, and camera-angle coverage:
-- Classes and annotation definitions: person, vessel, vehicle, container.
+- Classes and annotation definitions: small_boat, cargo_vessel.
 - Known exclusions and failure cases:
-- Negative/background scenes: water glare, blankets/tarps, shadows, cranes,
-  stacked cargo, empty berths, rain/fog, night lighting, partial occlusion:
+- Negative/background scenes: water glare, shadows, docks, cranes, shoreline,
+  empty berths, rain/fog, night lighting, and partial occlusion:
 
 ## Split integrity
 

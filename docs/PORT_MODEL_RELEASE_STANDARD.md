@@ -4,7 +4,7 @@ Status: software pipeline present; release is `BLOCKED_DATASET` until an authori
 
 ## Scope and classes
 
-The canonical deployment classes are `person`, `vessel`, `vehicle`, and `container`. Generic COCO YOLO weights are not a validated container/port model. Training data must document site/camera rights, collection period, sensor/resolution, weather/day/night distribution, distance/scale, occlusion, privacy handling, annotation rules, exclusions, and license in a completed dataset card.
+The custom maritime deployment classes are `small_boat` and `cargo_vessel`. The runtime normalises both to the canonical `vessel` risk category while preserving the model class in the evidence record. Generic COCO YOLO weights are not a validated maritime-classification model. Training data must document site/camera rights, collection period, sensor/resolution, weather/day/night distribution, distance/scale, occlusion, privacy handling, annotation rules, exclusions, and license in a completed dataset card.
 
 ## Data controls
 

@@ -41,7 +41,7 @@ def main() -> None:
                 "dataset_card_path", "dataset_fingerprint_sha256"}
     if required.difference(manifest):
         raise SystemExit("Manifest is incomplete")
-    if manifest["classes"] != ["person", "vessel", "vehicle", "container"] or len(manifest["classes"]) != CLASS_COUNT:
+    if manifest["classes"] != ["small_boat", "cargo_vessel"] or len(manifest["classes"]) != CLASS_COUNT:
         raise SystemExit("Manifest classes do not match the approved port-model contract")
     if sha256_file(args.model).lower() != str(manifest["sha256"]).lower():
         raise SystemExit("Candidate model SHA-256 does not match manifest")

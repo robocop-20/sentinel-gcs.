@@ -13,7 +13,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
-CLASS_COUNT = 4
+CLASS_COUNT = 2
+CLASS_NAMES = ("small_boat", "cargo_vessel")
 SPLITS = ("train", "val", "test")
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -136,7 +137,7 @@ def main() -> None:
         print("PORT_DATASET=FAIL")
         print("\n".join(report.errors[:100]))
         raise SystemExit(1)
-    print(f"PORT_DATASET=PASS images={report.image_count} classes=person,vessel,vehicle,container")
+    print(f"PORT_DATASET=PASS images={report.image_count} classes={','.join(CLASS_NAMES)}")
     for warning in report.warnings:
         print(f"WARNING: {warning}")
 

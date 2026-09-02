@@ -5,7 +5,5 @@ train: images/train
 val: images/val
 test: images/test
 names:
-  0: person
-  1: vessel
-  2: vehicle
-  3: container
+  0: small_boat
+  1: cargo_vessel

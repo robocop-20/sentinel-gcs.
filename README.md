@@ -19,6 +19,7 @@ optional advisory scene-review layer.
 | Configure or change a camera IP | `./set_camera_source.ps1 -Source <IP-or-URL>` |
 | Start the complete local stack | `./start_sentinel.ps1` |
 | Understand the processing layers | [Architecture](docs/ARCHITECTURE.md) |
+| View the physical drone reference photos | [Drone platform reference](docs/DRONE_PLATFORM.md) |
 | Prepare a production deployment | [Deployment and cutover](docs/DEPLOYMENT_AND_CUTOVER.md) |
 | Train or release a port model | [Port model release standard](docs/PORT_MODEL_RELEASE_STANDARD.md) |
 | Report a vulnerability | [Security policy](SECURITY.md) |
@@ -104,7 +105,7 @@ requires overall and per-class precision/recall, at least 50 explicitly labelled
 negative test images, bounded false positives per negative image, bounded
 false-positive image rate, p95 latency at most 60 ms, and throughput of at least
 20 FPS. These are internal acceptance targets, not a claim of external
-certification. The current generic COCO model is not a validated container model.
+certification. The current generic COCO model is not a validated small-boat or cargo-vessel model.
 
 The vision runtime includes the required ByteTrack linear-assignment dependency (`lap`) in `requirements-vision.txt`; it must be present in the built image, not auto-installed during an active mission.
 

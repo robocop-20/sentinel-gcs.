@@ -8,21 +8,24 @@ road classes to `vehicle`. It can only report objects that are visible in the
 camera frame; an indoor test view should not be expected to produce a boat or
 vehicle detection.
 
-## Containers
+## Fine-tuned maritime classes
 
-Standard COCO YOLO11 does **not** contain a shipping-container class. For real
-port use, supply a validated, licensed port-trained YOLO11 model at for example
-`C:\Users\ASUS\Downloads\fpv\models\port\port-yolo.pt`, with labels such as `container`,
-`shipping_container`, or `vehicle`, then set in `.env`:
+Standard COCO YOLO11 has only the broad `boat` class; it cannot reliably
+distinguish small boats from cargo vessels. For real port use, supply a
+validated, licensed port-trained YOLO11 model with exactly `small_boat` and
+`cargo_vessel` labels at for example
+`C:\Users\ASUS\Downloads\fpv\models\port\port-yolo.pt`, then set in `.env`:
 
 ```ini
 YOLO_MODEL=/models/port/port-yolo.pt
-TARGET_OBJECT_CLASSES=person,boat,container,shipping_container,vehicle,car,truck,bus,motorcycle
+TARGET_OBJECT_CLASSES=person,boat,vessel,small_boat,cargo_vessel,car,truck,bus,motorcycle,vehicle
+REQUIRE_MODEL_MANIFEST=true
 ```
 
-The pipeline already normalises the container labels to `container` and gives
-them persistent ByteTrack IDs. Do not replace the model until it has been
-validated on representative port footage with documented precision/recall.
+The pipeline normalises both custom labels to the canonical `vessel` risk
+category and gives them persistent ByteTrack IDs, while retaining the original
+model class in the detection record. Do not replace the model until it has been
+validated on representative port footage with documented precision and recall.
 
 ## Movement
 

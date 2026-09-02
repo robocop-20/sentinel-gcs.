@@ -38,6 +38,8 @@ COCO_CATEGORY = {
     "person": "person",
     "boat": "vessel",
     "vessel": "vessel",
+    "small_boat": "vessel",
+    "cargo_vessel": "vessel",
     "car": "vehicle",
     "truck": "vehicle",
     "bus": "vehicle",

@@ -220,11 +220,11 @@ class Settings:
     )
     confidence_track_ttl_s: float = float(os.getenv("CONFIDENCE_TRACK_TTL_S", "30"))
     # Standard COCO YOLO11 detects person/boat/car/truck/bus/motorcycle.
-    # `container`, `shipping_container`, and `vehicle` become active when a
+    # `small_boat` and `cargo_vessel` become active only when a validated
     # port-trained YOLO model with those labels is supplied through YOLO_MODEL.
     target_object_classes: str = os.getenv(
         "TARGET_OBJECT_CLASSES",
-        "person,boat,vessel,car,truck,bus,motorcycle,container,shipping_container,vehicle",
+        "person,boat,vessel,small_boat,cargo_vessel,car,truck,bus,motorcycle,vehicle",
     )
     motion_moving_threshold_px_s: float = float(
         os.getenv("MOTION_MOVING_THRESHOLD_PX_S", "15")
@@ -642,8 +642,12 @@ class Settings:
 
     @property
     def release_expected_classes(self) -> set[str]:
-        # COCO aliases are normalised by the worker; custom port models use the
-        # four canonical labels below.
+        # COCO aliases are normalised by the worker. A maritime custom model
+        # retains its two precise labels in the release manifest while runtime
+        # tracks both under the canonical `vessel` risk category.
+        maritime_classes = {"small_boat", "cargo_vessel"}
+        if maritime_classes.issubset(self.target_classes):
+            return maritime_classes
         return {
             value
             for value in self.target_classes

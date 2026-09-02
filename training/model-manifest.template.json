@@ -2,7 +2,7 @@
   "model_name": "port-yolo11",
   "model_version": "replace-with-version",
   "created_at_utc": "replace-with-ISO-8601-time",
-  "classes": ["person", "vessel", "vehicle", "container"],
+  "classes": ["small_boat", "cargo_vessel"],
   "base_model": "yolo11s.pt",
   "dataset_version": "replace-with-immutable-dataset-version",
   "dataset_license": "replace-with-dataset-license",

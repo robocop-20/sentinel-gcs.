@@ -13,7 +13,7 @@ def test_verified_model_release_requires_correct_hash_and_classes(tmp_path):
             {
                 "model_name": "port-yolo",
                 "model_version": "1.0.0",
-                "classes": ["person", "vessel", "vehicle", "container"],
+                "classes": ["small_boat", "cargo_vessel"],
                 "sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
                 "dataset_version": "port-2026-08",
                 "dataset_license": "operator-owned",
@@ -25,7 +25,7 @@ def test_verified_model_release_requires_correct_hash_and_classes(tmp_path):
         str(model),
         str(manifest),
         required=True,
-        expected_classes={"person", "vessel", "vehicle", "container"},
+        expected_classes={"small_boat", "cargo_vessel"},
     )
     assert release.verified
     assert release.version == "1.0.0"

@@ -68,7 +68,7 @@ def main() -> None:
         if _value(report, "overall", metric) < minimum
     ]
     per_class = report.get("per_class", {})
-    for class_name in ("person", "vessel", "vehicle", "container"):
+    for class_name in ("small_boat", "cargo_vessel"):
         for metric, minimum in (("precision", args.min_class_precision),
                                 ("recall", args.min_class_recall),
                                 ("map50_95", args.min_class_map50_95)):
