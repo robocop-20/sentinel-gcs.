@@ -24,6 +24,20 @@ optional advisory scene-review layer.
 | Train or release a port model | [Port model release standard](docs/PORT_MODEL_RELEASE_STANDARD.md) |
 | Report a vulnerability | [Security policy](SECURITY.md) |
 
+## FPV drone platform
+
+The local Sentinel prototype is designed around this FPV airframe and its
+onboard sensing hardware. See the [drone platform reference](docs/DRONE_PLATFORM.md)
+for installation notes and full-size photographs.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/drone-platform/airframe-overview.png" width="220" alt="Overall FPV drone airframe"><br><strong>Airframe overview</strong></td>
+    <td align="center"><img src="docs/assets/drone-platform/front-camera.png" width="220" alt="Forward-facing camera installation"><br><strong>Forward camera</strong></td>
+    <td align="center"><img src="docs/assets/drone-platform/flight-controller.png" width="220" alt="Flight controller and onboard electronics"><br><strong>Flight controller and electronics</strong></td>
+  </tr>
+</table>
+
 ### Repository contents
 
 | Path | Purpose |
