@@ -14,9 +14,9 @@ evidence/
 reports/
 *.log
 
-# Model weights, training inputs, and generated training output are distributed
-# separately from the source repository. They can be large, licensed
-# independently, and may contain sensitive operational data.
+# Generated training output, arbitrary model weights, and temporary archives
+# remain local. The approved runtime bundle and curated port dataset are
+# explicitly versioned in private Git LFS below.
 models/
 *.pt
 *.onnx
@@ -26,3 +26,15 @@ training/datasets/
 training/runs/
 runs/
 cloud_training/*.zip
+
+# Safe, portable project assets tracked in this private repository.
+!models/
+!models/**
+!models/**/*.pt
+!models/**/*.onnx
+!models/**/*.engine
+!models/**/*.weights
+!training/
+!training/datasets/
+!training/datasets/port/
+!training/datasets/port/**

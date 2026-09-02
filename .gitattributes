@@ -5,3 +5,7 @@ models/*.pt filter=lfs diff=lfs merge=lfs -text
 models/**/*.pt filter=lfs diff=lfs merge=lfs -text
 models/**/*.onnx filter=lfs diff=lfs merge=lfs -text
 models/**/*.pth filter=lfs diff=lfs merge=lfs -text
+
+# Curated, attributed port-training images are stored in private Git LFS.
+# Their YOLO labels and dataset configuration remain regular Git text files.
+training/datasets/port/**/*.jpg filter=lfs diff=lfs merge=lfs -text

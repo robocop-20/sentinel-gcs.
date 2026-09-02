@@ -51,10 +51,11 @@ for installation notes and full-size photographs.
 
 ### What is deliberately not in Git
 
-Camera URLs, `.env` secrets, API keys, evidence, databases, logs, training
-datasets, and generated outputs are ignored. Runtime model weights are stored
-in the private repository through Git LFS; run `git lfs pull` after cloning.
-See [models/README.md](models/README.md) for the approved model bundle.
+Camera URLs, `.env` secrets, API keys, evidence, databases, logs, and generated
+outputs are ignored. Runtime model weights and the curated, attributed port
+training dataset are stored in the private repository through Git LFS; run
+`git lfs pull` after cloning. See [models/README.md](models/README.md) and
+[the port dataset card](training/datasets/port/README.md) for their contracts.
 
 ### Architecture at a glance
 

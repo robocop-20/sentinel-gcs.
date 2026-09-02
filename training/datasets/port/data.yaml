@@ -1,0 +1,8 @@
+path: D:/fpv/training/datasets/port
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: small_boat
+  1: cargo_vessel
