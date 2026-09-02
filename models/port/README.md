@@ -1,15 +1,20 @@
-# Port Model Release Folder
+# Port vessel model
 
-Place only a validated custom model here as `port-yolo.pt`. Its labels must use
-the training contract: `person`, `vessel`, `vehicle`, and `container`.
+`sentinel-vessel-yolo11.pt` is the Git-LFS runtime checkpoint for the two
+classes supported by this prototype:
 
-Before copying a candidate here, run dataset validation and held-out evaluation,
-record the model SHA-256 and metrics in a completed model manifest, and obtain
-operator approval. The running vision service should then use:
+- `small_boat`
+- `cargo_vessel`
+
+After cloning, retrieve the model bundle with `git lfs pull`. The default
+`.env.example` already selects this model:
 
 ```ini
-YOLO_MODEL=/models/port/port-yolo.pt
-TARGET_OBJECT_CLASSES=person,vessel,vehicle,container
+YOLO_MODEL=/models/port/sentinel-vessel-yolo11.pt
+TARGET_OBJECT_CLASSES=small_boat,cargo_vessel
 ```
 
-No image, annotation, or model is uploaded by this repository's training tools.
+The vision worker normalises either label to the runtime category `vessel` for
+tracking and deterministic rules. This checkpoint is a candidate model; retain
+the training metadata, complete held-out evaluation, and obtain operator
+approval before any operational use.

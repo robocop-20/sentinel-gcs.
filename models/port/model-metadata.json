@@ -1,0 +1,17 @@
+{
+  "model_file": "sentinel-vessel-yolo11.pt",
+  "sha256": "f7bee1627401390abde9f3b99a1a775395f98b959fa403026999d401c7ad35e2",
+  "task": "object-detection",
+  "classes": ["small_boat", "cargo_vessel"],
+  "training": {
+    "base_model": "yolo11s.pt",
+    "epochs": 60,
+    "image_size": 640,
+    "batch_size": 2,
+    "seed": 42,
+    "dataset_image_count": 4998,
+    "dataset_fingerprint_sha256": "e7339838afc3af3d370b33763d97f2ae9fdda826b65caa544408814b7b056d4e"
+  },
+  "release_status": "candidate-not-approved",
+  "notes": "The raw training dataset, annotations, evidence, credentials, and camera configuration are intentionally not stored in the repository."
+}
