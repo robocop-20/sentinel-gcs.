@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#252b31">
   <title>Sentinel GCS | Operations</title>
   <link rel="stylesheet" href="/styles.css?v=20260816-7">
-  <link rel="stylesheet" href="/operations.css?v=20260903-7">
+  <link rel="stylesheet" href="/operations.css?v=20260903-8">
 </head>
 <body data-workspace="flight">
   <header class="app-header">
@@ -71,6 +71,12 @@
             <button data-map-layer="geofence">Geofence</button>
             <button data-map-layer="tracks">Tracks</button>
           </div>
+          <div class="map-view-tabs" aria-label="Map view">
+            <button class="active" data-map-view="street">Street</button>
+            <button data-map-view="satellite">Satellite</button>
+            <button data-map-view="marine">Maritime</button>
+            <button data-map-view="tactical">Tactical</button>
+          </div>
           <div class="map-source"><i></i><span id="map-source-label">LOCAL GRID · BASEMAP NOT CONFIGURED</span></div>
           <button class="upload-button" id="mission-upload" disabled title="MAVLink mission upload is not commissioned">Vehicle offline</button>
         </div>
@@ -88,7 +94,19 @@
           <div class="map-scale"><span id="map-scale-bar"></span><b id="map-scale-label">100 m</b></div>
           <div class="map-legend"><span><i class="vehicle-dot"></i>Aircraft</span><span><i class="track-dot"></i>Track</span><span><i class="fence-dot"></i>Restricted</span><span><i class="route-dot"></i>Draft route</span></div>
           <div class="map-readout"><span id="cursor-coordinate">CURSOR N/A</span><b id="plot-state">LOCAL / AWAITING GPS</b></div>
-          <div class="map-attribution"><span id="map-attribution-state">LIVE MAP</span> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></div>
+          <aside class="map-detail-card" aria-label="Operational map details">
+            <header><span>MAP DETAILS</span><b id="map-detail-view">STREET</b></header>
+            <dl>
+              <div><dt>Reference</dt><dd id="map-detail-position">AWAITING GPS</dd></div>
+              <div><dt>Aircraft</dt><dd id="map-detail-altitude">NO TELEMETRY</dd></div>
+              <div><dt>Heading</dt><dd id="map-detail-heading">N/A</dd></div>
+              <div><dt>Contacts</dt><dd id="map-detail-contacts">0 TRACKS</dd></div>
+              <div><dt>Geofences</dt><dd id="map-detail-geofences">0 ZONES</dd></div>
+              <div><dt>Route</dt><dd id="map-detail-route">0 WAYPOINTS</dd></div>
+            </dl>
+            <div class="map-detail-actions"><button id="map-focus-aircraft" type="button">FOCUS AIRCRAFT</button><button id="map-fit-operation" type="button">FIT OPERATION</button></div>
+          </aside>
+          <div class="map-attribution"><span id="map-attribution-state">LIVE MAP</span> · <a id="map-attribution-link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></div>
           <div id="map-hint" class="map-hint hidden">Click the map to place a waypoint</div>
         </div>
 
@@ -305,6 +323,6 @@
     <span>Advisory mode · operator approval required</span>
   </footer>
   <script src="/runtime-config.js"></script>
-  <script src="/app.js?v=20260903-4"></script>
+  <script src="/app.js?v=20260903-5"></script>
 </body>
 </html>

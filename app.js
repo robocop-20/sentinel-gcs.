@@ -16,10 +16,16 @@ let evidenceVerifications=[],securityAdvisories=[],socket=null,socketHeartbeat=n
 // Keep the operator preview close to the newest annotated frame without
 // continuously polling faster than the vision worker can publish it.
 const PREVIEW_REFRESH_INTERVAL_MS=75;
-let activeWorkspace='flight',activeMapTool='select',activeMapLayer='mission',mapZoom=1;
+let activeWorkspace='flight',activeMapTool='select',activeMapLayer='mission',activeMapView='street',mapZoom=1;
 let selectedTrackId='',selectedEventId='',pendingAckEventId='',pendingEventState='ACKNOWLEDGED',socketRetry=0,mapDrawPending=false;
 let mapCenterOverride=null,mapDrag=null,mapDragMoved=false,mapMotionFrame=0,lastMapMotionAt=0,connectionRetryTimer=null,currentMapView=null,lastMapCursor=null,mapTileTemplate='https://tile.openstreetmap.org/{z}/{x}/{y}.png',streetViewUrlTemplate='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat}%2C{lon}';
 const mapTiles=new Map(),MAP_TILE_SIZE=256;
+const MAP_VIEWS=Object.freeze({
+  street:{label:'STREET',template:null,attribution:'© OpenStreetMap contributors',attributionUrl:'https://www.openstreetmap.org/copyright'},
+  satellite:{label:'SATELLITE',template:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attribution:'Esri World Imagery',attributionUrl:'https://www.esri.com/arcgis-blog/products/arcgis-living-atlas/imagery/world-imagery/'},
+  marine:{label:'MARITIME',template:null,overlayTemplate:'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',attribution:'© OpenStreetMap · OpenSeaMap',attributionUrl:'https://www.openseamap.org/'},
+  tactical:{label:'TACTICAL',template:'',attribution:'Local tactical grid',attributionUrl:''}
+});
 let missionWaypoints=loadMissionDraft();
 let missionRecord=loadMissionRecord();
 let missionDirty=false;
@@ -101,11 +107,11 @@ function worldToGeo(x,y,zoom){
   const size=MAP_TILE_SIZE*2**zoom,longitude=x/size*360-180,n=Math.PI-2*Math.PI*y/size,latitude=180/Math.PI*Math.atan(Math.sinh(n));
   return{latitude,longitude};
 }
-function tileUrl(zoom,x,y){return mapTileTemplate.replace('{z}',zoom).replace('{x}',x).replace('{y}',y)}
-function requestMapTile(zoom,x,y){
-  const count=2**zoom,wrappedX=((x%count)+count)%count;if(y<0||y>=count)return null;const key=`${zoom}/${wrappedX}/${y}`,existing=mapTiles.get(key);if(existing&&!(existing.status==='failed'&&performance.now()-existing.failedAt>5000))return existing;if(existing)mapTiles.delete(key);
+function tileUrl(template,zoom,x,y){return template.replace('{z}',zoom).replace('{x}',x).replace('{y}',y)}
+function requestMapTile(source,template,zoom,x,y){
+  const count=2**zoom,wrappedX=((x%count)+count)%count;if(y<0||y>=count)return null;const key=`${source}/${zoom}/${wrappedX}/${y}`,existing=mapTiles.get(key);if(existing&&!(existing.status==='failed'&&performance.now()-existing.failedAt>5000))return existing;if(existing)mapTiles.delete(key);
   if(mapTiles.size>180){const removable=[...mapTiles.entries()].find(([,value])=>value.status!=='loading');if(removable)mapTiles.delete(removable[0])}
-  const tile={status:'loading',image:new Image(),loadedAt:0};mapTiles.set(key,tile);tile.image.referrerPolicy='strict-origin-when-cross-origin';tile.image.onload=()=>{tile.status='ready';tile.loadedAt=performance.now();drawTacticalPlot()};tile.image.onerror=()=>{tile.status='failed';tile.failedAt=performance.now();drawTacticalPlot()};tile.image.src=tileUrl(zoom,wrappedX,y);return tile;
+  const tile={status:'loading',image:new Image(),loadedAt:0};mapTiles.set(key,tile);tile.image.referrerPolicy='strict-origin-when-cross-origin';tile.image.onload=()=>{tile.status='ready';tile.loadedAt=performance.now();drawTacticalPlot()};tile.image.onerror=()=>{tile.status='failed';tile.failedAt=performance.now();drawTacticalPlot()};tile.image.src=tileUrl(template,zoom,wrappedX,y);return tile;
 }
 
 function setWorkspace(name){
@@ -126,6 +132,13 @@ function setMapTool(tool){
 function setMapLayer(layer){
   activeMapLayer=layer;
   document.querySelectorAll('[data-map-layer]').forEach(button=>button.classList.toggle('active',button.dataset.mapLayer===layer));
+  drawTacticalPlot();
+}
+function currentMapStyle(){const view=MAP_VIEWS[activeMapView]||MAP_VIEWS.street;return{...view,template:view.template===null?mapTileTemplate:view.template}}
+function setMapView(view){
+  activeMapView=MAP_VIEWS[view]?view:'street';
+  document.querySelectorAll('[data-map-view]').forEach(button=>button.classList.toggle('active',button.dataset.mapView===activeMapView));
+  try{localStorage.setItem('sentinel.map.view',activeMapView)}catch(_){}
   drawTacticalPlot();
 }
 
@@ -456,25 +469,57 @@ function mapContext(){
   const plot=point=>{const world=geoToWorld(point[0],point[1],tileZoom);return[width/2+(world.x-centerWorld.x)*visualScale,height/2+(world.y-centerWorld.y)*visualScale]},unplot=(x,y)=>worldToGeo(centerWorld.x+(x-width/2)/visualScale,centerWorld.y+(y-height/2)/visualScale,tileZoom);
   return{canvas,ctx,width,height,centerLat,centerLon,visibleRadius,scale,plot,unplot,tileZoom,zoomLevel,visualScale,centerWorld};
 }
-function drawVectorBasemap(map){
-  const{ctx,width,height,scale,visibleRadius,centerLat,centerLon,tileZoom,visualScale,centerWorld}=map;
-  ctx.fillStyle='#091016';ctx.fillRect(0,0,width,height);
-  const major=Math.max(48,100*scale),minor=major/5;
-  ctx.lineWidth=1;ctx.strokeStyle='#111d26';
+function drawGridFallback(map,style){
+  const{ctx,width,height,scale}=map,major=Math.max(48,100*scale),minor=major/5;
+  ctx.fillStyle=style.label==='TACTICAL'?'#071017':'#091016';ctx.fillRect(0,0,width,height);ctx.lineWidth=1;ctx.strokeStyle=style.label==='TACTICAL'?'#163044':'#111d26';
   for(let x=(width/2)%minor;x<width;x+=minor){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke()}
-  for(let y=(height/2)%minor;y<height;y+=minor){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke()}
-  ctx.strokeStyle='#1b2b36';
+  for(let y=(height/2)%minor;y<height;y+=minor){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(0+width,y);ctx.stroke()}
+  ctx.strokeStyle=style.label==='TACTICAL'?'#20526a':'#1b2b36';
   for(let x=(width/2)%major;x<width;x+=major){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke()}
   for(let y=(height/2)%major;y<height;y+=major){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke()}
+}
+function setMapAttribution(style,mode){
+  const link=byId('map-attribution-link');text('map-attribution-state',mode);
+  if(link){link.textContent=style.attribution;link.href=style.attributionUrl||'#';link.classList.toggle('hidden',!style.attributionUrl)}
+}
+function drawVectorBasemap(map){
+  const{ctx,width,height,visibleRadius,centerLat,centerLon,tileZoom,visualScale,centerWorld}=map,style=currentMapStyle();
+  drawGridFallback(map,style);
   const worldHalfWidth=width/(2*visualScale),worldHalfHeight=height/(2*visualScale),firstX=Math.floor((centerWorld.x-worldHalfWidth)/MAP_TILE_SIZE)-1,lastX=Math.floor((centerWorld.x+worldHalfWidth)/MAP_TILE_SIZE)+1,firstY=Math.floor((centerWorld.y-worldHalfHeight)/MAP_TILE_SIZE)-1,lastY=Math.floor((centerWorld.y+worldHalfHeight)/MAP_TILE_SIZE)+1,drawTileSize=MAP_TILE_SIZE*visualScale;let ready=0,loading=0;
-  for(let tileY=firstY;tileY<=lastY;tileY++)for(let tileX=firstX;tileX<=lastX;tileX++){
-    const tile=requestMapTile(tileZoom,tileX,tileY);if(!tile)continue;const drawX=(tileX*MAP_TILE_SIZE-centerWorld.x)*visualScale+width/2,drawY=(tileY*MAP_TILE_SIZE-centerWorld.y)*visualScale+height/2;
-    if(tile.status==='ready'){ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.globalAlpha=.96;ctx.drawImage(tile.image,drawX,drawY,drawTileSize+1,drawTileSize+1);ctx.restore();ready+=1}else if(tile.status==='loading')loading+=1;
+  if(style.template)for(let tileY=firstY;tileY<=lastY;tileY++)for(let tileX=firstX;tileX<=lastX;tileX++){
+    const tile=requestMapTile(`${activeMapView}-base`,style.template,tileZoom,tileX,tileY);if(!tile)continue;const drawX=(tileX*MAP_TILE_SIZE-centerWorld.x)*visualScale+width/2,drawY=(tileY*MAP_TILE_SIZE-centerWorld.y)*visualScale+height/2;
+    if(tile.status==='ready'){ctx.save();ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.globalAlpha=.97;ctx.drawImage(tile.image,drawX,drawY,drawTileSize+1,drawTileSize+1);ctx.restore();ready+=1}else if(tile.status==='loading')loading+=1;
   }
-  if(ready){ctx.fillStyle='rgba(7,15,20,.09)';ctx.fillRect(0,0,width,height);text('map-source-label','OPENSTREETMAP · LIVE RASTER');text('map-attribution-state','STANDARD TILES')}else{text('map-source-label',loading?'LOADING GEOGRAPHIC MAP':'OFFLINE TACTICAL GRID');text('map-attribution-state','GRID FALLBACK')}
-  ctx.strokeStyle='#3b5361';ctx.beginPath();ctx.moveTo(width/2-10,height/2);ctx.lineTo(width/2+10,height/2);ctx.moveTo(width/2,height/2-10);ctx.lineTo(width/2,height/2+10);ctx.stroke();
-  ctx.fillStyle='#e1e8ec';ctx.font='600 9px "Cascadia Mono",Consolas,monospace';ctx.fillText(ready?'TACTICAL MAP':'LOCAL TACTICAL GRID',14,21);
-  ctx.fillStyle='#aab7bf';ctx.font='8px "Cascadia Mono",Consolas,monospace';ctx.fillText(`${ready?'LIVE BASEMAP':'BASEMAP UNAVAILABLE'} · ${Math.round(visibleRadius)} m RADIUS`,14,36);ctx.fillText(`${centerLat.toFixed(5)}, ${centerLon.toFixed(5)}`,14,50);
+  if(style.overlayTemplate)for(let tileY=firstY;tileY<=lastY;tileY++)for(let tileX=firstX;tileX<=lastX;tileX++){
+    const overlay=requestMapTile(`${activeMapView}-overlay`,style.overlayTemplate,tileZoom,tileX,tileY);if(overlay?.status!=='ready')continue;const drawX=(tileX*MAP_TILE_SIZE-centerWorld.x)*visualScale+width/2,drawY=(tileY*MAP_TILE_SIZE-centerWorld.y)*visualScale+height/2;ctx.save();ctx.globalAlpha=.9;ctx.drawImage(overlay.image,drawX,drawY,drawTileSize+1,drawTileSize+1);ctx.restore();
+  }
+  const mode=style.template?(ready?`${style.label} · LIVE RASTER`:loading?`${style.label} · LOADING`:`${style.label} · OFFLINE GRID`):'TACTICAL · LOCAL GRID';text('map-source-label',mode);setMapAttribution(style,style.template&&ready?'LIVE MAP':'LOCAL MAP');
+  if(ready)ctx.fillStyle=style.label==='SATELLITE'?'rgba(4,11,14,.12)':'rgba(7,15,20,.09)';if(ready)ctx.fillRect(0,0,width,height);
+  ctx.strokeStyle='#7a97a5';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(width/2-10,height/2);ctx.lineTo(width/2+10,height/2);ctx.moveTo(width/2,height/2-10);ctx.lineTo(width/2,height/2+10);ctx.stroke();
+  ctx.fillStyle='#e1e8ec';ctx.font='600 9px "Cascadia Mono",Consolas,monospace';ctx.fillText(style.label,14,21);
+  ctx.fillStyle='#aab7bf';ctx.font='8px "Cascadia Mono",Consolas,monospace';ctx.fillText(`${ready?'LIVE BASEMAP':'LOCAL FALLBACK'} · ${Math.round(visibleRadius)} m RADIUS`,14,36);ctx.fillText(`${centerLat.toFixed(5)}, ${centerLon.toFixed(5)}`,14,50);
+}
+function updateMapDetails(map){
+  const telemetry=latestTelemetry,view=currentMapStyle(),heading=Number(telemetry?.heading_deg);
+  text('map-detail-view',view.label);text('map-detail-position',`${map.centerLat.toFixed(5)}, ${map.centerLon.toFixed(5)}`);
+  text('map-detail-altitude',telemetry?.altitude_m==null?'NO TELEMETRY':`${num(telemetry.altitude_m,1)} m AGL`);
+  text('map-detail-heading',telemetry&&Number.isFinite(heading)?`${heading.toFixed(0).padStart(3,'0')}° ${cardinalFromHeading(heading)}`:'N/A');
+  text('map-detail-contacts',`${tracks.size} TRACK${tracks.size===1?'':'S'}`);text('map-detail-geofences',`${geofences.length} ZONE${geofences.length===1?'':'S'}`);text('map-detail-route',`${missionWaypoints.length} WAYPOINT${missionWaypoints.length===1?'':'S'}`);
+}
+function focusMapOnPoints(points){
+  const valid=points.filter(point=>Number.isFinite(Number(point?.latitude))&&Number.isFinite(Number(point?.longitude)));if(!valid.length)return false;
+  const latitude=valid.reduce((sum,point)=>sum+Number(point.latitude),0)/valid.length,longitude=valid.reduce((sum,point)=>sum+Number(point.longitude),0)/valid.length;
+  let radius=80;valid.forEach(point=>{radius=Math.max(radius,haversine({latitude,longitude},point))});mapCenterOverride={latitude,longitude};
+  const previousZoom=mapZoom;mapZoom=1;const baselineRadius=mapContext().visibleRadius;mapZoom=clamp(baselineRadius/Math.max(120,radius*1.5),.25,8);if(!Number.isFinite(mapZoom))mapZoom=previousZoom;drawTacticalPlot();return true;
+}
+function focusAircraft(){
+  if(!latestTelemetry||!focusMapOnPoints([latestTelemetry])){text('plot-state','AIRCRAFT GPS REQUIRED');return}
+  text('plot-state','FOCUSED ON AIRCRAFT');
+}
+function fitOperationalMap(){
+  const points=[];if(latestTelemetry)points.push(latestTelemetry);missionWaypoints.forEach(point=>points.push(point));tracks.forEach(track=>{if(track.location)points.push(track.location)});geofences.forEach(zone=>(zone.coordinates||[]).forEach(([latitude,longitude])=>points.push({latitude,longitude})));
+  if(!focusMapOnPoints(points)){mapCenterOverride=null;mapZoom=1;drawTacticalPlot();text('plot-state','LOCAL / AWAITING GPS');return}
+  text('plot-state',`FIT ${points.length} OPERATIONAL POINT${points.length===1?'':'S'}`);
 }
 function drawTacticalPlot(){
   if(mapDrawPending)return;mapDrawPending=true;requestAnimationFrame(()=>{mapDrawPending=false;drawTacticalPlotNow()});
@@ -488,7 +533,7 @@ function drawTacticalPlotNow(){
     const[x,y]=plot([track.location.latitude,track.location.longitude]),selected=track.track_id===selectedTrackId,pulse=(Math.sin(performance.now()/260)+1)/2;ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.fillStyle=selected?'#4cc3e8':'#e8a93e';ctx.strokeStyle='#081016';ctx.lineWidth=2;ctx.fillRect(-5,-5,10,10);ctx.strokeRect(-5,-5,10,10);ctx.restore();if(selected){ctx.strokeStyle=`rgba(76,195,232,${.9-pulse*.45})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,12+pulse*7,0,Math.PI*2);ctx.stroke()}const tag=`${String(track.track_id||'').slice(-8)}  ${Math.round((track.display_confidence??track.confidence??0)*100)}%`;ctx.font='600 8px "Cascadia Mono",Consolas,monospace';const tagWidth=ctx.measureText(tag).width+8;ctx.fillStyle='#0b1117e8';ctx.fillRect(x+9,y-15,tagWidth,13);ctx.strokeStyle=selected?'#4cc3e8':'#5d4d2a';ctx.strokeRect(x+9,y-15,tagWidth,13);ctx.fillStyle=selected?'#aeeeff':'#f0c671';ctx.fillText(tag,x+13,y-6)});
   if(latestTelemetry){const[x,y]=plot([latestTelemetry.latitude,latestTelemetry.longitude]),pulse=(Math.sin(performance.now()/320)+1)/2;ctx.strokeStyle=`rgba(57,168,232,${.55-pulse*.25})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,17+pulse*6,0,Math.PI*2);ctx.stroke();ctx.save();ctx.translate(x,y);ctx.rotate((latestTelemetry.heading_deg||0)*Math.PI/180);ctx.fillStyle='#39a8e8';ctx.strokeStyle='#dff4ff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(8,10);ctx.lineTo(0,6);ctx.lineTo(-8,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
   const rawScaleDistance=90/scale,scalePower=10**Math.floor(Math.log10(Math.max(rawScaleDistance,.01))),scaleUnit=rawScaleDistance/scalePower,niceScale=(scaleUnit>=5?5:scaleUnit>=2?2:1)*scalePower,scaleBar=byId('map-scale-bar');if(scaleBar)scaleBar.style.width=`${Math.max(24,Math.round(niceScale*scale))}px`;
-  text('plot-state',latestTelemetry?'GEO-REFERENCED':'LOCAL / AWAITING GPS');text('map-scale-label',niceScale>=1000?`${(niceScale/1000).toFixed(niceScale>=10000?0:1)} km`:`${Math.round(niceScale)} m`);
+  text('plot-state',latestTelemetry?'GEO-REFERENCED':'LOCAL / AWAITING GPS');text('map-scale-label',niceScale>=1000?`${(niceScale/1000).toFixed(niceScale>=10000?0:1)} km`:`${Math.round(niceScale)} m`);updateMapDetails(map);
 }
 function updateMissionStats(){
   let distance=0,maxRange=0;for(let i=1;i<missionWaypoints.length;i++)distance+=haversine(missionWaypoints[i-1],missionWaypoints[i]);
@@ -536,12 +581,13 @@ function bindControls(){
   document.querySelectorAll('button[data-workspace]').forEach(button=>button.addEventListener('click',()=>setWorkspace(button.dataset.workspace)));
   document.querySelectorAll('[data-map-tool]').forEach(button=>button.addEventListener('click',()=>{if(activeWorkspace!=='plan'&&button.dataset.mapTool==='waypoint')setWorkspace('plan');setMapTool(button.dataset.mapTool)}));
   document.querySelectorAll('[data-map-layer]').forEach(button=>button.addEventListener('click',()=>setMapLayer(button.dataset.mapLayer)));
+  document.querySelectorAll('[data-map-view]').forEach(button=>button.addEventListener('click',()=>setMapView(button.dataset.mapView)));
   document.querySelectorAll('[data-dock-tab]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-dock-tab]').forEach(item=>item.classList.toggle('active',item===button));byId('object-list').classList.toggle('hidden',button.dataset.dockTab!=='tracks');byId('event-list').classList.toggle('hidden',button.dataset.dockTab!=='events')}));
   byId('track-filter').addEventListener('input',renderTrackWorkspace);byId('track-class-filter').addEventListener('change',renderTrackWorkspace);byId('alert-filter').addEventListener('input',renderAlertWorkspace);byId('alert-severity-filter').addEventListener('change',renderAlertWorkspace);
   byId('mission-new').addEventListener('click',()=>{missionRecord=null;missionDirty=false;saveMissionRecord();missionWaypoints=[];saveMissionDraft();updateMissionStats();setMapTool('waypoint');drawTacticalPlot()});
   byId('mission-undo').addEventListener('click',()=>{missionWaypoints.pop();missionDirty=true;saveMissionDraft();updateMissionStats();drawTacticalPlot()});
   byId('mission-clear').addEventListener('click',()=>{missionWaypoints=[];missionDirty=true;saveMissionDraft();updateMissionStats();drawTacticalPlot()});
-  byId('mission-save').addEventListener('click',saveMissionToServer);byId('mission-upload').addEventListener('click',prepareMissionUpload);byId('mission-export').addEventListener('click',exportMission);byId('map-zoom-in').addEventListener('click',()=>{mapZoom=clamp(mapZoom*1.4,.5,8);drawTacticalPlot()});byId('map-zoom-out').addEventListener('click',()=>{mapZoom=clamp(mapZoom/1.4,.5,8);drawTacticalPlot()});
+  byId('mission-save').addEventListener('click',saveMissionToServer);byId('mission-upload').addEventListener('click',prepareMissionUpload);byId('mission-export').addEventListener('click',exportMission);byId('map-zoom-in').addEventListener('click',()=>{mapZoom=clamp(mapZoom*1.4,.5,8);drawTacticalPlot()});byId('map-zoom-out').addEventListener('click',()=>{mapZoom=clamp(mapZoom/1.4,.5,8);drawTacticalPlot()});byId('map-focus-aircraft').addEventListener('click',focusAircraft);byId('map-fit-operation').addEventListener('click',fitOperationalMap);
   byId('street-view-button').addEventListener('click',openStreetView);byId('camera-source-form').addEventListener('submit',saveCameraSource);byId('asset-registration-form').addEventListener('submit',registerOperatorAsset);
   byId('camera-fit-toggle').addEventListener('click',toggleCameraFit);byId('camera-refresh').addEventListener('click',requestCameraRefresh);byId('camera-snapshot').addEventListener('click',saveCameraSnapshot);byId('camera-fullscreen').addEventListener('click',toggleCameraFullscreen);
   document.addEventListener('fullscreenchange',()=>{const button=byId('camera-fullscreen');if(button)button.textContent=document.fullscreenElement?'EXIT FULL SCREEN':'FULL SCREEN'});
@@ -564,7 +610,7 @@ function bindControls(){
 
 function startRuntime(){
   if(runtimeStarted){connectOperations();refreshSystemState();refreshPreview();return}runtimeStarted=true;
-  try{cameraViewMode=localStorage.getItem('sentinel.camera.view')==='fill'?'fill':'fit'}catch(_){}applyCameraViewMode();
+  try{cameraViewMode=localStorage.getItem('sentinel.camera.view')==='fill'?'fill':'fit';activeMapView=MAP_VIEWS[localStorage.getItem('sentinel.map.view')]?localStorage.getItem('sentinel.map.view'):'street'}catch(_){}applyCameraViewMode();setMapView(activeMapView);
   bindControls();initializeReplayWindow();if(missionRecord){byId('mission-name').value=missionRecord.name||'Untitled mission';byId('mission-vehicle').value=missionRecord.vehicle_id||'';if(Number(missionRecord.cruise_speed_mps)>0)byId('mission-cruise-speed').value=missionRecord.cruise_speed_mps;const first=missionRecord.waypoints?.[0];if(first){if(Number(first.altitude_m)>0)byId('mission-default-altitude').value=first.altitude_m;if(Number(first.hold_time_s)>=0)byId('mission-hold-time').value=first.hold_time_s}}updateMissionStats();updateClock();setInterval(updateClock,1000);setWorkspace('flight');connectOperations();refreshSystemState();loadOperatorConfiguration();setInterval(refreshSystemState,5000);refreshPreview();drawTacticalPlot();if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches&&!mapMotionFrame)mapMotionFrame=requestAnimationFrame(animateOperationalMap);
 }
 async function bootstrap(){
