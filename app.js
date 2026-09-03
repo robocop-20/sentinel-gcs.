@@ -10,7 +10,7 @@ const byId=id=>document.getElementById(id);
 const tracks=new Map(),events=new Map(),devices=new Map();
 const trackTrails=new Map();
 let latestTelemetry=null,latestRange=null,latestVision=null,geofences=[],capabilities=null,readiness=null;
-let evidenceVerifications=[],securityAdvisories=[],socket=null,socketHeartbeat=null,previewFailures=0;
+let evidenceVerifications=[],securityAdvisories=[],socket=null,socketHeartbeat=null,previewFailures=0,previewTimer=null,previewInFlight=false,previewRenderedAt=0;
 // The vision worker publishes Full-HD preview frames at 10 FPS.  Poll below
 // that cadence made a healthy stream look visibly delayed in the grid.
 // Keep the operator preview close to the newest annotated frame without
@@ -24,7 +24,7 @@ let missionWaypoints=loadMissionDraft();
 let missionRecord=loadMissionRecord();
 let missionDirty=false;
 let replayMode=false,replayRecords=[];
-let accessToken=sessionStorage.getItem('sentinel.access_token')||'',runtimeStarted=false,currentPreviewUrl='';
+let accessToken=sessionStorage.getItem('sentinel.access_token')||'',runtimeStarted=false,currentPreviewUrl='',cameraViewMode='fit';
 // This deployment is intentionally localhost-only and uses no browser login.
 // API authorization is disabled in D:\fpv\.env to match this console mode.
 const LOCAL_OPERATOR_MODE=true;
@@ -76,8 +76,18 @@ function updateClock(){
   if(latestTelemetry){const age=Math.max(0,now-Number(latestTelemetry.timestamp||0));text('gps-state',age>10?'LOST':age>2?`STALE ${age.toFixed(1)}s`:String(latestTelemetry.gps_fix||'UNKNOWN').replaceAll('_',' '));text('sensor-gps-age',`${age.toFixed(1)}s`);}
   if(latestVision){const age=Math.max(0,now-Number(latestVision.timestamp||0));text('sensor-camera-age',`${age.toFixed(1)}s`);if(age>5){text('preview-status',`STALE ${age.toFixed(1)}s`);text('wall-camera-state',`STALE ${age.toFixed(1)}s`);setFooterLight('status-video','bad')}}
   if(latestRange)text('sensor-lidar-age',`${Math.max(0,now-Number(latestRange.timestamp||0)).toFixed(1)}s`);
+  updateCameraFrameAge();
 }
 function setFooterLight(id,grade){const node=byId(id);if(node)node.className=grade||''}
+function setCameraStreamState(state){
+  ['wall-live-light','wall-live-indicator'].forEach(id=>{const light=byId(id);if(light)light.className=state||''});
+}
+function updateCameraFrameAge(){
+  if(!previewRenderedAt)return;
+  const seconds=Math.max(0,(Date.now()-previewRenderedAt)/1000),label=seconds<1?`${Math.round(seconds*1000)} ms ago`:`${seconds.toFixed(1)} s ago`;
+  text('wall-frame-age',label);text('preview-frame-age',label);
+  if(seconds>5){setCameraStreamState('bad');text('camera-feed-summary','Primary stream stale · 3 offline')}
+}
 function haversine(a,b){
   const earth=6371000,toRad=Math.PI/180,dLat=(b.latitude-a.latitude)*toRad,dLon=(b.longitude-a.longitude)*toRad;
   const p=Math.sin(dLat/2)**2+Math.cos(a.latitude*toRad)*Math.cos(b.latitude*toRad)*Math.sin(dLon/2)**2;
@@ -149,9 +159,10 @@ function applyVision(data){
   text('preview-camera',String(data.source||'camera-01').toUpperCase());text('capture-fps',num(data.capture_fps));text('preview-fps',num(data.inference_fps));
   text('preview-latency',num(data.last_end_to_end_ms,0));text('frame-count',`FRAME ${data.frames_inferred??'--'}`);text('sensor-detections',data.last_detection_count??tracks.size);
   text('model-name',model);text('wall-model-name',model);text('wall-fps',`${num(data.inference_fps)} FPS`);
+  text('wall-latency',`${num(data.last_end_to_end_ms,0)} ms`);text('wall-detections',`${data.last_detection_count??tracks.size} track${Number(data.last_detection_count??tracks.size)===1?'':'s'}`);
   text('model-integrity',data.model_integrity_verified?'MODEL VERIFIED':'MODEL UNVERIFIED');
   text('sensor-camera-state',processing?'LIVE':'DEGRADED');text('sensor-camera-fps',`${num(data.capture_fps)} FPS`);text('sensor-camera-source',String(data.source||'N/A'));text('settings-model',model);text('settings-model-integrity',data.model_integrity_verified?'VERIFIED':'UNVERIFIED');text('settings-vision-device',String(data.device||'N/A').toUpperCase());
-  text('preview-status',processing?'LIVE':'WAITING');text('wall-camera-state',processing?'LIVE / PROCESSING':String(data.status||'WAITING').toUpperCase());
+  text('preview-status',processing?'LIVE':'WAITING');text('wall-camera-state',processing?'LIVE / PROCESSING':String(data.status||'WAITING').toUpperCase());text('camera-feed-summary',processing?'1 live · 3 offline':'1 configured · 3 offline');setCameraStreamState(processing?'good':'warn');
   setFooterLight('status-video',processing?'good':'bad');setFooterLight('status-model',processing?'good':'warn');
 }
 
@@ -392,20 +403,49 @@ async function registerOperatorAsset(event){
   try{const response=await authFetch('/api/operator/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_id,device_type,endpoint})}),payload=await response.json();if(!response.ok)throw new Error(payload.detail||`REGISTER FAILED ${response.status}`);byId('asset-endpoint-input').value='';text('asset-registration-status','Registered · adapter/V2X provisioning still required');await loadOperatorConfiguration()}catch(error){text('asset-registration-status',String(error.message||'REGISTER FAILED').toUpperCase())}finally{button.disabled=false}
 }
 function refreshPreview(delay=0){
-  setTimeout(async()=>{
+  if(previewTimer)clearTimeout(previewTimer);
+  previewTimer=window.setTimeout(async()=>{
+    previewTimer=null;
     // Local operator mode deliberately has no browser token.  The previous
     // guard therefore prevented the camera preview from ever being fetched,
     // even while OpenCV, YOLO and the bridge were publishing valid frames.
     if(!LOCAL_OPERATOR_MODE&&!accessToken)return;
+    if(previewInFlight){refreshPreview(PREVIEW_REFRESH_INTERVAL_MS);return}
+    previewInFlight=true;
     try{
       const response=await authFetch(`/api/vision/preview.jpg?t=${Date.now()}`);if(!response.ok)throw new Error(`preview ${response.status}`);
       const nextUrl=URL.createObjectURL(await response.blob()),image=new Image();
-      image.onload=()=>{const oldUrl=currentPreviewUrl;currentPreviewUrl=nextUrl;byId('vision-preview').src=nextUrl;byId('sensor-wall-preview').src=nextUrl;if(oldUrl)URL.revokeObjectURL(oldUrl);byId('video-wait').classList.add('hidden');byId('wall-video-wait').classList.add('hidden');text('preview-resolution',`${image.naturalWidth} × ${image.naturalHeight}`);text('wall-resolution',`${image.naturalWidth} × ${image.naturalHeight}`);previewFailures=0;refreshPreview(PREVIEW_REFRESH_INTERVAL_MS)};
-      image.onerror=()=>{URL.revokeObjectURL(nextUrl);previewFailed()};image.src=nextUrl;
-    }catch(_){previewFailed()}
+      await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=nextUrl});
+      const oldUrl=currentPreviewUrl;currentPreviewUrl=nextUrl;
+      byId('vision-preview').src=nextUrl;byId('sensor-wall-preview').src=nextUrl;
+      if(oldUrl)URL.revokeObjectURL(oldUrl);
+      byId('video-wait').classList.add('hidden');byId('wall-video-wait').classList.add('hidden');
+      text('preview-resolution',`${image.naturalWidth} × ${image.naturalHeight}`);text('wall-resolution',`${image.naturalWidth} × ${image.naturalHeight}`);
+      previewFailures=0;previewRenderedAt=Date.now();updateCameraFrameAge();setCameraStreamState('good');
+      if(!latestVision||latestVision.status!=='processing'){text('preview-status','RECEIVING');text('wall-camera-state','LIVE / RECEIVING');text('camera-feed-summary','1 live · 3 offline');setFooterLight('status-video','good')}
+      refreshPreview(PREVIEW_REFRESH_INTERVAL_MS);
+    }catch(_){previewFailed()}finally{previewInFlight=false}
   },delay);
 }
-function previewFailed(){previewFailures+=1;if(previewFailures>2){byId('video-wait').classList.remove('hidden');byId('wall-video-wait').classList.remove('hidden');text('preview-status','WAITING');text('wall-camera-state','WAITING')}refreshPreview(Math.min(2500,500+previewFailures*250))}
+function previewFailed(){
+  previewFailures+=1;
+  if(previewFailures>2){byId('video-wait').classList.remove('hidden');byId('wall-video-wait').classList.remove('hidden');text('preview-status','WAITING');text('wall-camera-state','WAITING');text('camera-feed-summary','Primary camera unavailable · 3 offline');setCameraStreamState('bad');setFooterLight('status-video','bad')}
+  refreshPreview(Math.min(2500,500+previewFailures*250));
+}
+function applyCameraViewMode(){
+  const fill=cameraViewMode==='fill';document.querySelectorAll('.primary-video,.wall-video').forEach(node=>node.classList.toggle('camera-fill',fill));
+  const button=byId('camera-fit-toggle');if(button){button.textContent=fill?'FILL':'FIT';button.setAttribute('aria-pressed',String(fill));button.title=fill?'Show the entire frame':'Fill the available camera area'}
+}
+function toggleCameraFit(){cameraViewMode=cameraViewMode==='fit'?'fill':'fit';try{localStorage.setItem('sentinel.camera.view',cameraViewMode)}catch(_){}applyCameraViewMode()}
+function requestCameraRefresh(){previewFailures=0;text('preview-status','REFRESHING');text('wall-camera-state','REFRESHING');refreshPreview(0)}
+async function saveCameraSnapshot(){
+  const source=currentPreviewUrl||byId('sensor-wall-preview')?.currentSrc;if(!source){text('wall-camera-state','NO FRAME TO SAVE');return}
+  try{const response=await fetch(source);if(!response.ok)throw new Error();const blob=await response.blob(),url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=`sentinel-annotated-${new Date().toISOString().replaceAll(':','-').replaceAll('.','-')}.jpg`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);text('wall-camera-state','SNAPSHOT SAVED')}catch(_){text('wall-camera-state','SNAPSHOT UNAVAILABLE')}
+}
+async function toggleCameraFullscreen(){
+  const stage=byId('camera-stage');if(!stage)return;
+  try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen()}catch(_){text('wall-camera-state','FULL SCREEN UNAVAILABLE')}
+}
 
 function mapContext(){
   const canvas=byId('tactical-canvas'),rect=canvas.getBoundingClientRect(),ratio=Math.min(window.devicePixelRatio||1,2),width=rect.width,height=rect.height;
@@ -503,6 +543,8 @@ function bindControls(){
   byId('mission-clear').addEventListener('click',()=>{missionWaypoints=[];missionDirty=true;saveMissionDraft();updateMissionStats();drawTacticalPlot()});
   byId('mission-save').addEventListener('click',saveMissionToServer);byId('mission-upload').addEventListener('click',prepareMissionUpload);byId('mission-export').addEventListener('click',exportMission);byId('map-zoom-in').addEventListener('click',()=>{mapZoom=clamp(mapZoom*1.4,.5,8);drawTacticalPlot()});byId('map-zoom-out').addEventListener('click',()=>{mapZoom=clamp(mapZoom/1.4,.5,8);drawTacticalPlot()});
   byId('street-view-button').addEventListener('click',openStreetView);byId('camera-source-form').addEventListener('submit',saveCameraSource);byId('asset-registration-form').addEventListener('submit',registerOperatorAsset);
+  byId('camera-fit-toggle').addEventListener('click',toggleCameraFit);byId('camera-refresh').addEventListener('click',requestCameraRefresh);byId('camera-snapshot').addEventListener('click',saveCameraSnapshot);byId('camera-fullscreen').addEventListener('click',toggleCameraFullscreen);
+  document.addEventListener('fullscreenchange',()=>{const button=byId('camera-fullscreen');if(button)button.textContent=document.fullscreenElement?'EXIT FULL SCREEN':'FULL SCREEN'});
   ['mission-name','mission-vehicle'].forEach(id=>byId(id).addEventListener('input',()=>{missionDirty=true;updateMissionStats()}));
   ['mission-default-altitude','mission-cruise-speed','mission-hold-time'].forEach(id=>byId(id).addEventListener('input',()=>{missionDirty=true;updateMissionStats()}));
   byId('mission-apply-defaults').addEventListener('click',()=>{const altitude=Math.max(1,Number(byId('mission-default-altitude').value)||50),speed=Math.max(.1,Number(byId('mission-cruise-speed').value)||8),hold=Math.max(0,Number(byId('mission-hold-time').value)||0);missionWaypoints=missionWaypoints.map(point=>({...point,altitude_m:altitude,speed_mps:speed,hold_time_s:hold}));missionDirty=true;saveMissionDraft();updateMissionStats()});
@@ -522,6 +564,7 @@ function bindControls(){
 
 function startRuntime(){
   if(runtimeStarted){connectOperations();refreshSystemState();refreshPreview();return}runtimeStarted=true;
+  try{cameraViewMode=localStorage.getItem('sentinel.camera.view')==='fill'?'fill':'fit'}catch(_){}applyCameraViewMode();
   bindControls();initializeReplayWindow();if(missionRecord){byId('mission-name').value=missionRecord.name||'Untitled mission';byId('mission-vehicle').value=missionRecord.vehicle_id||'';if(Number(missionRecord.cruise_speed_mps)>0)byId('mission-cruise-speed').value=missionRecord.cruise_speed_mps;const first=missionRecord.waypoints?.[0];if(first){if(Number(first.altitude_m)>0)byId('mission-default-altitude').value=first.altitude_m;if(Number(first.hold_time_s)>=0)byId('mission-hold-time').value=first.hold_time_s}}updateMissionStats();updateClock();setInterval(updateClock,1000);setWorkspace('flight');connectOperations();refreshSystemState();loadOperatorConfiguration();setInterval(refreshSystemState,5000);refreshPreview();drawTacticalPlot();if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches&&!mapMotionFrame)mapMotionFrame=requestAnimationFrame(animateOperationalMap);
 }
 async function bootstrap(){

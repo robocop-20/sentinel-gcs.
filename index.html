@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#252b31">
   <title>Sentinel GCS | Operations</title>
   <link rel="stylesheet" href="/styles.css?v=20260816-7">
-  <link rel="stylesheet" href="/operations.css?v=20260823-6">
+  <link rel="stylesheet" href="/operations.css?v=20260903-7">
 </head>
 <body data-workspace="flight">
   <header class="app-header">
@@ -103,12 +103,12 @@
       </div>
 
       <div id="camera-workspace" class="workspace-view sensor-wall hidden" data-view="camera">
-        <div class="workspace-title"><div><small>SENSORS</small><h2>Camera feeds</h2></div><span>1 configured · 3 offline</span></div>
+        <div class="workspace-title"><div><small>SENSORS</small><h2>Camera feeds</h2></div><span id="camera-feed-summary">1 configured · 3 offline</span></div>
         <div class="sensor-wall-grid">
           <article class="wall-feed wall-feed-primary">
-            <header><b>EO-01 · ANNOTATED</b><span id="wall-camera-state">WAITING</span></header>
-            <div class="wall-video"><img id="sensor-wall-preview" alt="Primary annotated electro-optical camera"><div id="wall-video-wait" class="feed-empty">Awaiting primary camera frame</div><div class="wall-reticle"></div></div>
-            <footer><span id="wall-model-name">YOLO11</span><span id="wall-resolution">-- × --</span><span id="wall-fps">0.0 FPS</span></footer>
+            <header><b>EO-01 · ANNOTATED</b><div class="feed-state"><i id="wall-live-light" aria-hidden="true"></i><span id="wall-camera-state">WAITING</span></div></header>
+            <div id="camera-stage" class="wall-video"><img id="sensor-wall-preview" alt="Primary annotated electro-optical camera" decoding="async"><div id="wall-video-wait" class="feed-empty">Awaiting primary camera frame</div><div class="camera-live-readout"><span><i id="wall-live-indicator" aria-hidden="true"></i>LIVE</span><span id="wall-frame-age">FRAME --</span></div><div class="wall-reticle"></div><div class="camera-stage-controls" aria-label="Primary camera controls"><button id="camera-fit-toggle" type="button" aria-pressed="false" title="Switch between full frame and fill view">FIT</button><button id="camera-refresh" type="button" title="Request the newest camera frame">REFRESH</button><button id="camera-snapshot" type="button" title="Save the current annotated frame">SNAPSHOT</button><button id="camera-fullscreen" type="button" title="Open camera in full screen">FULL SCREEN</button></div></div>
+            <footer><span id="wall-model-name">YOLO11</span><span id="wall-resolution">-- × --</span><span id="wall-fps">0.0 FPS</span><span id="wall-latency">-- ms</span><span id="wall-detections">0 tracks</span></footer>
           </article>
           <article class="wall-feed offline"><header><b>IR-01 · THERMAL</b><span>NOT LINKED</span></header><div class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="m16 10 5-3v10l-5-3M6 4c1 1 1 3 0 4m4-4c1 1 1 3 0 4"/></svg></span><span>RTSP endpoint not configured</span></div><footer><span>CHANNEL 02</span><span>NO SIGNAL</span></footer></article>
           <article class="wall-feed offline"><header><b>PORT-02 · FIXED</b><span>NOT LINKED</span></header><div class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 10h13l3 3v4H6l-3-3Z"/><circle cx="10" cy="13.5" r="2.5"/><path d="M16 7V4h4v9M4 18h4"/></svg></span><span>VMS adapter not configured</span></div><footer><span>CHANNEL 03</span><span>NO SIGNAL</span></footer></article>
@@ -225,10 +225,10 @@
       <section class="dock-panel camera-panel">
         <header><div><small>PRIMARY PAYLOAD</small><b>EO-01 / AI OVERLAY</b></div><span id="preview-status">WAITING</span></header>
         <div class="primary-video">
-          <img id="vision-preview" alt="Live annotated object detection preview">
+          <img id="vision-preview" alt="Live annotated object detection preview" decoding="async">
           <div id="video-wait" class="feed-empty"><span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="6" width="14" height="12" rx="2"/><circle cx="10" cy="12" r="3"/><path d="m17 10 4-2v8l-4-2M7 6l1-2h4l1 2"/></svg></span><span>Waiting for OpenCV frames</span></div>
           <div class="video-osd top"><span id="preview-camera">CAMERA-01</span><span id="model-name">YOLO11</span></div>
-          <div class="video-osd bottom"><span id="frame-count">FRAME --</span><span id="preview-resolution">-- × --</span></div>
+          <div class="video-osd bottom"><span id="frame-count">FRAME --</span><span id="preview-resolution">-- × --</span><span id="preview-frame-age">FRAME --</span></div>
           <div class="compact-reticle"></div>
         </div>
         <div class="camera-tabs">
@@ -305,6 +305,6 @@
     <span>Advisory mode · operator approval required</span>
   </footer>
   <script src="/runtime-config.js"></script>
-  <script src="/app.js?v=20260823-3"></script>
+  <script src="/app.js?v=20260903-4"></script>
 </body>
 </html>
