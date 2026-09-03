@@ -15,6 +15,7 @@ optional advisory scene-review layer.
 
 | Goal | Read / run |
 | --- | --- |
+| Install and run the full local stack | [Complete setup guide](docs/COMPLETE_SETUP.md) |
 | Join the private team and run the stack | [Team setup](docs/TEAM_SETUP.md) |
 | Configure or change a camera IP | `./set_camera_source.ps1 -Source <IP-or-URL>` |
 | Start the complete local stack | `./start_sentinel.ps1` |
