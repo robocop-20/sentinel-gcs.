@@ -2077,7 +2077,7 @@ body,
 .map-detail-card dl > div:nth-last-child(-n+2) { border-bottom: 0; }
 .map-detail-card dt { margin-bottom: 3px; color: #93a2ac; font: 700 8px var(--font-data); letter-spacing: .035em; }
 .map-detail-card dd { overflow: hidden; margin: 0; color: #edf2f4; font: 600 9px var(--font-data); text-overflow: ellipsis; white-space: nowrap; }
-.map-detail-actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #394650; }
+.map-detail-actions { display: grid; grid-template-columns: repeat(3,1fr); border-top: 1px solid #394650; }
 .map-detail-actions button { min-height: 30px; border: 0; border-right: 1px solid #394650; background: #17222a; color: #c9dbe3; font: 700 8px var(--font-data); letter-spacing: .035em; cursor: pointer; }
 .map-detail-actions button:last-child { border-right: 0; }
 .map-detail-actions button:hover { background: #1c536a; color: #fff; }
@@ -2090,3 +2090,11 @@ body,
   .map-view-tabs { display: none; }
   .map-detail-card { right: 9px; top: 9px; width: 214px; }
 }
+#map-workspace:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  grid-template-rows: 48px minmax(0,1fr) 66px;
+  background: var(--bg-void);
+}
+#map-workspace:fullscreen .map-stage { min-height: 0; }
+#map-workspace:fullscreen .map-detail-card { top: 16px; right: 18px; }
